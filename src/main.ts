@@ -147,8 +147,10 @@ class AudioSidebarView extends ItemView {
     if (!this.folder) return;
     const files = this.plugin.findAudioInFolder(this.folder);
     const header = body.createDiv({ cls: 'audio-sb-header' });
-    header.createSpan({ text: this.folder.name || 'Audio', cls: 'audio-sb-folder-name' });
-    header.createSpan({ text: `${files.length} tracks`, cls: 'audio-sb-count' });
+    const headerCopy = header.createDiv({ cls: 'audio-sb-header-copy' });
+    headerCopy.createSpan({ text: this.folder.name || 'Audio', cls: 'audio-sb-folder-name' });
+    headerCopy.createSpan({ text: `${files.length} tracks`, cls: 'audio-sb-count' });
+    this.iconButton(header, 'settings', 'Audio Sidebar settings', () => this.plugin.openSettings()).addClass('audio-sb-settings');
     const search = body.createEl('input', { cls: 'audio-sb-search', type: 'search', attr: { placeholder: 'Search tracks…', 'aria-label': 'Search tracks' } });
     search.value = this.search;
     search.addEventListener('input', () => { this.search = search.value; this.filterRows(); });
@@ -180,21 +182,7 @@ class AudioSidebarView extends ItemView {
         this.plugin.player.play(file, files.map(item => item.path), this.folder?.name || 'Audio');
       });
       row.addEventListener('contextmenu', event => {
-        event.preventDefault();
-        const isCurrent = this.plugin.player.file?.path === file.path;
-        const menu = new Menu();
-        menu.addItem(item => item
-          .setTitle(isCurrent && this.plugin.player.playing ? 'Pause' : 'Play')
-          .setIcon(isCurrent && this.plugin.player.playing ? 'pause' : 'play')
-          .onClick(() => {
-            if (isCurrent) this.plugin.player.toggle();
-            else this.plugin.player.play(file, files.map(entry => entry.path), this.folder?.name || 'Audio');
-          }));
-        menu.addItem(item => item
-          .setTitle('Show in Files')
-          .setIcon('folder-search')
-          .onClick(() => void this.plugin.revealFile(file)));
-        menu.showAtMouseEvent(event);
+        this.showTrackMenu(event, file, files.map(entry => entry.path), this.folder?.name || 'Audio');
       });
     }
     this.filterRows();
@@ -264,6 +252,25 @@ class AudioSidebarView extends ItemView {
     return button;
   }
 
+  private showTrackMenu(event: MouseEvent, file: TFile, queuePaths: string[], queueName: string): void {
+    event.preventDefault();
+    event.stopPropagation();
+    const isCurrent = this.plugin.player.file?.path === file.path;
+    const menu = new Menu();
+    menu.addItem(item => item
+      .setTitle(isCurrent && this.plugin.player.playing ? 'Pause' : 'Play')
+      .setIcon(isCurrent && this.plugin.player.playing ? 'pause' : 'play')
+      .onClick(() => {
+        if (isCurrent) this.plugin.player.toggle();
+        else this.plugin.player.play(file, queuePaths, queueName);
+      }));
+    menu.addItem(item => item
+      .setTitle('Show in Files')
+      .setIcon('folder-search')
+      .onClick(() => void this.plugin.revealFile(file)));
+    menu.showAtMouseEvent(event);
+  }
+
   private updateQueue(): void {
     if (!this.queuePopup) return;
     const scroll = this.queuePopup.scrollTop;
@@ -289,6 +296,9 @@ class AudioSidebarView extends ItemView {
         if (this.plugin.player.file?.path === file.path) this.plugin.player.toggle();
         else this.plugin.player.play(file, this.plugin.player.queuePaths, this.plugin.player.queueName);
       });
+      row.addEventListener('contextmenu', event => {
+        this.showTrackMenu(event, file, this.plugin.player.queuePaths, this.plugin.player.queueName);
+      });
     }
     this.queuePopup.scrollTop = scroll;
   }
@@ -313,6 +323,14 @@ export default class AudioSidebarPlugin extends Plugin {
   private mediaSessionOwned = false;
   private nativeMirrors = new Set<HTMLAudioElement>();
   private nativeMirrorSyncUntil = new WeakMap<HTMLAudioElement, number>();
+
+  openSettings(): void {
+    const setting = (this.app as App & {
+      setting?: { open: () => void; openTabById: (id: string) => void };
+    }).setting;
+    setting?.open();
+    setting?.openTabById(this.manifest.id);
+  }
 
   async onload(): Promise<void> {
     const saved = await this.loadData() || {};
