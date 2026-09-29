@@ -77,6 +77,19 @@ describe('AudioSidebarApp', () => {
     expect(controls.setQuery).toHaveBeenLastCalledWith('4batz');
   });
 
+  it('toggles playback from the whole track row without double handling the play button', async () => {
+    const controls = controller();
+    render(<AudioSidebarApp controller={controls} initialSnapshot={snapshot()} />);
+    const trackTitle = screen.getAllByText('Open Fire').find(element => element.closest('.audio-sb-item'));
+    const trackRow = trackTitle?.closest('.audio-sb-item');
+    expect(trackRow).not.toBeNull();
+    await userEvent.click(trackRow!);
+    expect(controls.playTrack).toHaveBeenCalledTimes(1);
+    vi.mocked(controls.playTrack).mockClear();
+    await userEvent.click(screen.getByRole('button', { name: 'Pause Open Fire' }));
+    expect(controls.playTrack).toHaveBeenCalledTimes(1);
+  });
+
   it('routes every transport control through the controller', async () => {
     const controls = controller();
     render(<AudioSidebarApp controller={controls} initialSnapshot={snapshot()} />);

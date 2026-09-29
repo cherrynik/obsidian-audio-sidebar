@@ -110,10 +110,10 @@ export function AudioSidebarApp({ controller, initialSnapshot }: {
             className={`audio-sb-item${active ? ' audio-sb-item-active' : ''}`}
             data-path={track.path}
             aria-current={active}
-            onDoubleClick={() => controller.playTrack(track.path)}
+            onClick={() => controller.playTrack(track.path)}
             onContextMenu={event => controller.openTrackMenu(track.path, event.nativeEvent)}
           >
-            <IconButton label={`${active && state.playing ? 'Pause' : 'Play'} ${track.title}`} className="audio-sb-icon-btn audio-sb-track-play" onClick={() => controller.playTrack(track.path)}>
+            <IconButton label={`${active && state.playing ? 'Pause' : 'Play'} ${track.title}`} className="audio-sb-icon-btn audio-sb-track-play" onClick={event => { event.stopPropagation(); controller.playTrack(track.path); }}>
               {active && state.playing ? <Pause /> : <Play />}
             </IconButton>
             <div className="audio-sb-track-copy">
