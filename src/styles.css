@@ -207,7 +207,7 @@
   max-height: 38px;
   aspect-ratio: 1;
   flex: 0 0 38px;
-  overflow: hidden;
+  overflow: visible;
   transform: none !important;
   box-shadow: none !important;
   background: transparent !important;
@@ -490,5 +490,20 @@
 
 .audio-sb-view .audio-sb-footer .audio-sb-transport button.audio-sb-icon-btn.audio-sb-main-play:focus-visible {
   outline: none !important;
-  box-shadow: 0 0 0 2px var(--interactive-accent) !important;
+  box-shadow: none !important;
+}
+
+.audio-sb-view .audio-sb-footer .audio-sb-transport button.audio-sb-icon-btn.audio-sb-main-play:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.audio-sb-view .audio-sb-footer .audio-sb-transport button.audio-sb-icon-btn.audio-sb-main-play:focus::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border: 2px solid var(--interactive-accent);
+  border-radius: 50%;
+  box-sizing: border-box;
+  pointer-events: none;
 }
