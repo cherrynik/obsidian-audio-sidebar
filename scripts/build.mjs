@@ -1,8 +1,9 @@
 import { build } from 'esbuild';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
+mkdirSync('dist', { recursive: true });
 const result = await build({
-  entryPoints: ['src/main.js'],
+  entryPoints: ['src/main.ts'],
   bundle: true,
   minify: true,
   legalComments: 'none',
@@ -11,13 +12,10 @@ const result = await build({
   target: 'es2020',
   loader: { '.svg': 'text' },
   external: ['obsidian'],
-  outfile: 'main.js',
+  outfile: 'dist/main.js',
   write: false
 });
-
 const license = readFileSync('node_modules/plyr/LICENSE.md', 'utf8').trim();
-const bundledCode = result.outputFiles[0].text;
-writeFileSync('main.js', `/*\n${license}\n*/\n${bundledCode}`);
-const baseStyle = readFileSync('node_modules/plyr/dist/plyr.css', 'utf8');
-const customStyle = readFileSync('src/styles.css', 'utf8');
-writeFileSync('styles.css', `${baseStyle}\n${customStyle}`);
+writeFileSync('dist/main.js', `/*\n${license}\n*/\n${result.outputFiles[0].text}`);
+writeFileSync('dist/styles.css', `${readFileSync('node_modules/plyr/dist/plyr.css', 'utf8')}\n${readFileSync('src/styles.css', 'utf8')}`);
+copyFileSync('manifest.json', 'dist/manifest.json');

@@ -1,13 +1,17 @@
 {
   "name": "cherrynik-audio-sidebar",
   "private": true,
-  "version": "2.1.0",
+  "version": "2.2.0",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "check": "npm run build && node --check main.js && node --test test/*.test.cjs && git diff --check"
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run build && node --check dist/main.js && node --test test/*.test.cjs && git diff --check"
   },
   "devDependencies": {
-    "esbuild": "^0.25.0"
+    "@types/node": "^26.6.3",
+    "esbuild": "^0.25.0",
+    "obsidian": "^1.13.1",
+    "typescript": "^7.0.2"
   },
   "dependencies": {
     "plyr": "^3.8.4"

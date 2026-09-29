@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { test } = require('node:test');
 const vm = require('node:vm');
+const { transformSync } = require('esbuild');
 
 class FakeAudio {
   constructor() {
@@ -27,7 +28,8 @@ class FakeAudio {
 }
 
 const loaded = { exports: {} };
-vm.runInNewContext(readFileSync('src/player.js', 'utf8'), { module: loaded });
+const compiled = transformSync(readFileSync('src/player.ts', 'utf8'), { loader: 'ts', format: 'cjs' }).code;
+vm.runInNewContext(compiled, { module: loaded, exports: loaded.exports });
 const { SingleAudioPlayer } = loaded.exports;
 const files = ['Audio/one.mp3', 'Audio/two.mp3'].map(path => ({
   path, basename: path.split('/').pop(), extension: 'mp3', parent: { name: 'Audio' }
@@ -56,29 +58,29 @@ test('one persistent audio element changes source and preserves folder queue', (
   assert.equal(audio.src, '');
 });
 
-test('the player supports pause, resume, seek, volume and speed', () => {
+test('the native media element keeps Plyr volume and speed state', () => {
   const { player, audio } = createPlayer();
   player.play(files[0], [files[0].path], 'Audio');
   player.pause();
   assert.equal(player.playing, false);
   player.resume();
   assert.equal(player.playing, true);
-  player.seek(90);
+  audio.currentTime = 90;
   assert.equal(player.position, 90);
-  player.setVolume(0.35);
-  player.setRate(1.5);
+  audio.volume = 0.35;
+  audio.playbackRate = 1.5;
+  audio.dispatch('volumechange');
+  audio.dispatch('ratechange');
+  assert.equal(player.volume, 0.35);
+  assert.equal(player.rate, 1.5);
   assert.equal(audio.volume, 0.35);
   assert.equal(audio.playbackRate, 1.5);
 });
 
-test('end advances in the original queue or repeats the active track', () => {
+test('end advances in the original folder queue', () => {
   const { player, audio } = createPlayer();
   player.play(files[0], files.map(file => file.path), 'Audio');
   audio.dispatch('ended');
   assert.equal(player.file.path, files[1].path);
-  player.setRepeatOne(true);
-  audio.currentTime = 180;
-  audio.dispatch('ended');
-  assert.equal(player.file.path, files[1].path);
-  assert.equal(audio.currentTime, 0);
+  assert.equal(player.audio, audio);
 });
