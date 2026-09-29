@@ -194,12 +194,14 @@ describe('AudioSidebarApp', () => {
     expect(queueTrigger).not.toHaveFocus();
   });
 
-  it('keeps automatic menu controls unfocused while allowing explicit playback focus', () => {
+  it('prevents mouse focus while keeping controls keyboard-focusable', () => {
     render(<AudioSidebarApp controller={controller()} initialSnapshot={snapshot()} />);
     const queue = screen.getByRole('button', { name: 'Playback queue' });
     const play = screen.getByRole('button', { name: 'Pause' });
     expect(fireEvent.pointerDown(queue, { pointerType: 'mouse', button: 0 })).toBe(false);
-    expect(fireEvent.pointerDown(play, { pointerType: 'mouse', button: 0 })).toBe(true);
+    expect(fireEvent.pointerDown(play, { pointerType: 'mouse', button: 0 })).toBe(false);
+    play.focus();
+    expect(play).toHaveFocus();
   });
 });
 
@@ -209,7 +211,7 @@ describe('theme-safe styles', () => {
   it('keeps focus geometry on the inner circular surface', () => {
     expect(css).toMatch(/\.audio-sb-icon-surface\s*\{[^}]*border-radius:\s*50%/s);
     expect(css).toMatch(/\.audio-sb-icon-btn:focus-visible\s+\.audio-sb-icon-surface/);
-    expect(css).not.toMatch(/\.audio-sb-icon-btn:focus\s+\.audio-sb-icon-surface/);
+    expect(css).toMatch(/\.audio-sb-icon-btn:focus\s+\.audio-sb-icon-surface/);
   });
 
   it('uses theme-aware colors for range value tooltips', () => {

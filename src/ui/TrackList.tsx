@@ -20,7 +20,7 @@ export function TrackList({ tracks, currentPath, playing, controller }: {
         onClick={() => controller.playTrack(track.path)}
         onContextMenu={event => controller.openTrackMenu(track.path, event.nativeEvent)}
       >
-        <IconButton label={`${active && playing ? 'Pause' : 'Play'} ${track.title}`} className="audio-sb-icon-btn audio-sb-track-play" focusOnMousePress onClick={event => { event.stopPropagation(); controller.playTrack(track.path); }}>
+        <IconButton label={`${active && playing ? 'Pause' : 'Play'} ${track.title}`} className="audio-sb-icon-btn audio-sb-track-play" onClick={event => { event.stopPropagation(); controller.playTrack(track.path); }}>
           {active && playing ? <Pause /> : <Play />}
         </IconButton>
         <div className="audio-sb-track-copy">

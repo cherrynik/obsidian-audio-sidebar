@@ -117,14 +117,12 @@
   pointer-events: none;
 }
 .audio-sb-view button.audio-sb-icon-btn:hover:not(:disabled) { background: transparent !important; color: var(--text-normal); }
+.audio-sb-view button.audio-sb-icon-btn:focus,
 .audio-sb-view button.audio-sb-icon-btn:focus-visible {
   outline: none !important;
 }
+.audio-sb-view button.audio-sb-icon-btn:focus .audio-sb-icon-surface,
 .audio-sb-view button.audio-sb-icon-btn:focus-visible .audio-sb-icon-surface {
-  border-color: var(--interactive-accent);
-}
-.audio-sb-view button.audio-sb-main-play:focus .audio-sb-icon-surface,
-.audio-sb-view button.audio-sb-track-play:focus .audio-sb-icon-surface {
   border-color: var(--interactive-accent);
 }
 .audio-sb-view button.audio-sb-icon-btn:disabled { opacity: .35; cursor: default; }
@@ -306,9 +304,11 @@
   cursor: pointer;
 }
 .audio-sb-view button.audio-sb-speed:hover { background: transparent !important; color: var(--text-normal); }
+.audio-sb-view button.audio-sb-speed:focus,
 .audio-sb-view button.audio-sb-speed:focus-visible {
   outline: none !important;
 }
+.audio-sb-view button.audio-sb-speed:focus .audio-sb-icon-surface,
 .audio-sb-view button.audio-sb-speed:focus-visible .audio-sb-icon-surface {
   border-color: var(--interactive-accent);
 }
