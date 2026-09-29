@@ -59,8 +59,9 @@ class AudioSidebarView extends ItemView {
     const currentTrack = this.footer.createDiv({ cls: 'audio-sb-current-track' });
     const currentCopy = currentTrack.createDiv({ cls: 'audio-sb-current-copy' });
     this.title = currentCopy.createDiv({ cls: 'audio-sb-current-title' });
-    this.artist = currentCopy.createDiv({ cls: 'audio-sb-current-artist' });
-    this.location = currentCopy.createEl('button', {
+    const currentMeta = currentCopy.createDiv({ cls: 'audio-sb-current-meta' });
+    this.artist = currentMeta.createSpan({ cls: 'audio-sb-current-artist' });
+    this.location = currentMeta.createEl('button', {
       cls: 'audio-sb-current-location',
       type: 'button',
       attr: { 'aria-label': 'Show current track in Files', title: 'Show in Files' }
@@ -192,7 +193,7 @@ class AudioSidebarView extends ItemView {
     this.artist.textContent = label.artist;
     this.artist.toggleClass('audio-sb-hidden', !label.artist);
     const parentPath = this.plugin.player.file?.parent?.path || '';
-    this.location.textContent = parentPath.split('/').join(' / ');
+    this.location.textContent = parentPath.split('/').join(' › ');
     this.location.toggleClass('audio-sb-hidden', !parentPath);
     this.footer.toggleClass('audio-sb-hidden', !hasTrack);
     this.previous.disabled = !hasTrack;
