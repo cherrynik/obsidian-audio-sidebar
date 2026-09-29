@@ -1,7 +1,7 @@
 {
   "name": "cherrynik-audio-sidebar",
   "private": true,
-  "version": "1.9.0",
+  "version": "2.0.0",
   "scripts": {
     "build": "node scripts/build.mjs",
     "check": "npm run build && node --check main.js && node --test test/*.test.cjs && git diff --check"
