@@ -14,6 +14,7 @@ class ObsidianAudioSidebarController implements AudioSidebarController {
   private query = '';
   private queueOpen = false;
   private speedOpen = false;
+  private focusedPath: string | null = null;
   private snapshot: AudioSidebarSnapshot = this.createSnapshot();
   private durationRequests = new Set<string>();
 
@@ -31,7 +32,15 @@ class ObsidianAudioSidebarController implements AudioSidebarController {
     if (!(folder instanceof TFolder)) return;
     if (this.folder?.path === folder.path) return;
     this.folder = folder;
+    this.focusedPath = null;
     this.refresh();
+  }
+
+  focusTrack(path: string): boolean {
+    if (!this.snapshot.tracks.some(track => track.path === path)) return false;
+    this.focusedPath = path;
+    this.refresh();
+    return true;
   }
 
   refresh(): void {
@@ -64,6 +73,7 @@ class ObsidianAudioSidebarController implements AudioSidebarController {
       tracks,
       query: this.query,
       currentPath: currentFile?.path ?? null,
+      focusedPath: this.focusedPath,
       currentTrack,
       currentLocation: currentFile?.parent?.path.split('/').join(' › ') || '',
       playing: player?.playing ?? false,
@@ -137,11 +147,17 @@ class AudioSidebarView extends ItemView {
   refreshFolder(): void { this.controller.refresh(); }
   updatePlayer(): void { this.controller.refresh(); }
 
-  focusTrack(path: string): void {
+  focusTrack(path: string): boolean {
+    if (!this.controller.focusTrack(path)) return false;
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      this.contentEl.querySelector<HTMLElement>(`.audio-sb-item[data-path="${CSS.escape(path)}"]`)
-        ?.scrollIntoView({ block: 'center' });
+      const row = this.contentEl.querySelector<HTMLElement>(`.audio-sb-item[data-path="${CSS.escape(path)}"]`);
+      const list = row?.closest<HTMLElement>('.audio-sb-list');
+      if (!row || !list) return;
+      const rowBounds = row.getBoundingClientRect();
+      const listBounds = list.getBoundingClientRect();
+      list.scrollTop += rowBounds.top - listBounds.top - (listBounds.height - rowBounds.height) / 2;
     }));
+    return true;
   }
 
   async onClose(): Promise<void> {
@@ -275,6 +291,9 @@ export default class AudioSidebarPlugin extends Plugin {
     this.registerEvent(this.app.workspace.on('file-open', file => {
       if (!(file instanceof TFile) || !AUDIO_EXTENSIONS.has(file.extension.toLowerCase())) return;
       if (this.followFilesSelection && file.parent) this.selectFolder(file.parent);
+      for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
+        if (leaf.view instanceof AudioSidebarView) leaf.view.focusTrack(file.path);
+      }
       this.attachNativeMirror(file);
     }));
     this.registerEvent(this.app.vault.on('create', file => {

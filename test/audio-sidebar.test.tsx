@@ -14,6 +14,7 @@ const snapshot = (overrides: Partial<AudioSidebarSnapshot> = {}): AudioSidebarSn
   tracks,
   query: '',
   currentPath: tracks[0].path,
+  focusedPath: null,
   playing: true,
   position: 32,
   duration: 172,
@@ -76,6 +77,17 @@ describe('AudioSidebarApp', () => {
     render(<AudioSidebarApp controller={controls} initialSnapshot={snapshot()} />);
     fireEvent.change(screen.getByPlaceholderText('Search tracks…'), { target: { value: '4batz' } });
     expect(controls.setQuery).toHaveBeenLastCalledWith('4batz');
+  });
+
+  it('shows file focus independently from the playing track', () => {
+    const state = snapshot({ focusedPath: tracks[1].path });
+    render(<AudioSidebarApp controller={controller(state)} initialSnapshot={state} />);
+    const playingRow = screen.getAllByText('Open Fire').find(element => element.closest('.audio-sb-item'))?.closest('.audio-sb-item');
+    const focusedRow = screen.getByText('act vi: mad man').closest('.audio-sb-item');
+    expect(playingRow).toHaveClass('audio-sb-item-active');
+    expect(playingRow).not.toHaveClass('audio-sb-item-focused');
+    expect(focusedRow).toHaveClass('audio-sb-item-focused');
+    expect(focusedRow).not.toHaveClass('audio-sb-item-active');
   });
 
   it('toggles playback from the whole track row without double handling the play button', async () => {

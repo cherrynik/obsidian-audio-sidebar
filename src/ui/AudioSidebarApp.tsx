@@ -17,6 +17,7 @@ export type AudioSidebarSnapshot = {
   tracks: AudioTrack[];
   query: string;
   currentPath: string | null;
+  focusedPath: string | null;
   currentTrack?: AudioTrack;
   currentLocation?: string;
   playing: boolean;
@@ -141,9 +142,10 @@ export function AudioSidebarApp({ controller, initialSnapshot }: {
       <div className="audio-sb-list">
         {filtered.map(track => {
           const active = track.path === state.currentPath;
+          const focused = track.path === state.focusedPath;
           return <div
             key={track.path}
-            className={`audio-sb-item${active ? ' audio-sb-item-active' : ''}`}
+            className={`audio-sb-item${active ? ' audio-sb-item-active' : ''}${focused ? ' audio-sb-item-focused' : ''}`}
             data-path={track.path}
             aria-current={active}
             onClick={() => controller.playTrack(track.path)}
