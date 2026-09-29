@@ -1,10 +1,10 @@
 {
   "id": "cherrynik-audio-sidebar",
-  "name": "CherryNIK Audio Sidebar",
-  "version": "2.4.9",
+  "name": "cherrynik Audio Sidebar",
+  "version": "2.4.10",
   "minAppVersion": "1.6.0",
   "description": "A simple persistent audio player for one track at a time.",
-  "author": "CherryNIK",
+  "author": "cherrynik",
   "authorUrl": "https://github.com/cherrynik",
   "isDesktopOnly": false
 }

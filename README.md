@@ -1,4 +1,4 @@
-# CherryNIK Audio Sidebar
+# cherrynik Audio Sidebar
 
 A compact Obsidian player for the `Audio` folder. Selecting an audio folder in Files or Nested Pages updates the track list. Playback continues when you browse notes or folders.
 
@@ -6,7 +6,7 @@ Only one file can play at a time. Starting another track changes the source of t
 
 Playing an audio file inside a note hands it to the persistent sidebar player. macOS media keys and Obsidian commands can change tracks. Volume and speed persist across restarts.
 
-The audio plugin is separate from [CherryNIK Explorer Shortcuts](https://github.com/cherrynik/obsidian-explorer-shortcuts), which controls keyboard navigation in Obsidian's Files panel.
+The audio plugin is separate from [cherrynik Explorer Shortcuts](https://github.com/cherrynik/obsidian-explorer-shortcuts), which controls keyboard navigation in Obsidian's Files panel.
 
 ## Development
 

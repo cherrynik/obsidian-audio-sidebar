@@ -448,7 +448,7 @@ export default class AudioSidebarPlugin extends Plugin {
     }
     this.mediaSessionOwned = true;
     if (typeof MediaMetadata !== 'undefined' && session.metadata?.title !== this.player.file.basename) {
-      session.metadata = new MediaMetadata({ title: this.player.file.basename, artist: 'CherryNIK Audio Sidebar' });
+      session.metadata = new MediaMetadata({ title: this.player.file.basename, artist: 'cherrynik Audio Sidebar' });
     }
     session.playbackState = this.player.playing ? 'playing' : 'paused';
     const actions = {
