@@ -11,6 +11,7 @@ class AudioSidebarView extends ItemView {
   private folder: TFolder | null = null;
   private search = '';
   private list!: HTMLElement;
+  private footer!: HTMLElement;
   private title!: HTMLElement;
   private media!: HTMLElement;
   private plyr?: Plyr;
@@ -31,9 +32,8 @@ class AudioSidebarView extends ItemView {
     root.addClass('audio-sb-view');
     const body = root.createDiv({ cls: 'audio-sb-body' });
     this.list = body.createDiv({ cls: 'audio-sb-list' });
-    const footer = root.createDiv({ cls: 'audio-sb-footer' });
-    footer.createDiv({ text: 'Now playing', cls: 'audio-sb-footer-label' });
-    this.title = footer.createDiv({ cls: 'audio-sb-current-title' });
+    this.footer = root.createDiv({ cls: 'audio-sb-footer' });
+    this.title = this.footer.createDiv({ cls: 'audio-sb-current-title' });
     if (!document.getElementById('cherrynik-plyr-icons')) {
       const icons = document.createElement('div');
       icons.id = 'cherrynik-plyr-icons';
@@ -41,7 +41,7 @@ class AudioSidebarView extends ItemView {
       icons.innerHTML = plyrIcons;
       document.body.prepend(icons);
     }
-    this.media = footer.createDiv({ cls: 'audio-sb-media' });
+    this.media = this.footer.createDiv({ cls: 'audio-sb-media' });
     this.media.appendChild(this.plugin.player.audio);
     this.plyr = new Plyr(this.plugin.player.audio, {
       controls: ['play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'settings'],
@@ -103,13 +103,15 @@ class AudioSidebarView extends ItemView {
     this.list.querySelectorAll<HTMLButtonElement>('.audio-sb-item').forEach(row => {
       const active = row.dataset.path === this.plugin.player.file?.path;
       row.toggleClass('audio-sb-item-active', active);
+      row.setAttribute('aria-current', active ? 'true' : 'false');
       row.setAttribute('aria-label', `${active && this.plugin.player.playing ? 'Pause' : 'Play'} ${row.textContent}`);
     });
   }
 
   updatePlayer(): void {
-    this.title.textContent = this.plugin.player.file?.basename || 'Nothing playing';
-    this.media.toggleClass('audio-sb-hidden', !this.plugin.player.file);
+    const hasTrack = !!this.plugin.player.file;
+    this.title.textContent = this.plugin.player.file?.basename || '';
+    this.footer.toggleClass('audio-sb-hidden', !hasTrack);
     this.updateTrackList();
   }
 
