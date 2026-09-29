@@ -5,6 +5,7 @@ export class SingleAudioPlayer {
   file: TFile | null = null;
   queuePaths: string[] = [];
   queueName = '';
+  wantsPlayback = false;
   volume: number;
   rate: number;
 
@@ -39,6 +40,7 @@ export class SingleAudioPlayer {
   get duration(): number { return Number.isFinite(this.audio.duration) ? this.audio.duration : 0; }
 
   play(file: TFile, queuePaths: string[], queueName: string, startTime = 0): void {
+    this.wantsPlayback = true;
     this.audio.pause();
     this.file = file;
     this.queuePaths = queuePaths.length ? [...queuePaths] : [file.path];
@@ -54,8 +56,12 @@ export class SingleAudioPlayer {
     this.onChange();
   }
 
-  pause(): void { this.audio.pause(); }
-  resume(): void { if (this.file) void this.audio.play().catch(error => this.onError(error.message)); }
+  pause(): void { this.wantsPlayback = false; this.audio.pause(); }
+  resume(): void {
+    if (!this.file) return;
+    this.wantsPlayback = true;
+    void this.audio.play().catch(error => { this.wantsPlayback = false; this.onError(error.message); });
+  }
   toggle(): void { this.playing ? this.pause() : this.resume(); }
   playRelative(offset: number): void {
     if (!this.file || !this.queuePaths.length) return;
@@ -65,6 +71,7 @@ export class SingleAudioPlayer {
     if (file && 'extension' in file) this.play(file as TFile, this.queuePaths, this.queueName);
   }
   stop(): void {
+    this.wantsPlayback = false;
     this.audio.pause();
     this.audio.removeAttribute('src');
     this.audio.load();
