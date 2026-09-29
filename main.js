@@ -458,34 +458,11 @@ class AudioSidebarView extends ItemView {
   // Rebuilds the entire sidebar DOM. Called once on open and again after a
   // settings change that requires a full redraw (e.g. overlap toggle).
   draw(folder) {
-    this._looping = true;
+    this._looping = false;
     this._suppressPauseSync = false;
     const content = this.containerEl.children[1];
     content.empty();
     content.addClass('audio-sb-view');
-
-    const toolbar = content.createEl('div', { cls: 'audio-sb-toolbar' });
-    const loadRow = toolbar.createEl('div', { cls: 'audio-sb-load-row' });
-    const loadBtn = loadRow.createEl('button', {
-      cls: 'audio-sb-cog-btn',
-      type: 'button',
-      attr: { 'aria-label': 'Reload selected folder', title: 'Reload selected folder' }
-    });
-    setIcon(loadBtn, 'refresh-cw');
-    loadBtn.onclick = () => {
-      const folder = this.plugin.selectedFolder;
-      if (folder) this.loadFolder(folder);
-    };
-    const cogBtn = loadRow.createEl('button', {
-      cls: 'audio-sb-cog-btn',
-      type: 'button',
-      attr: { 'aria-label': 'Audio Sidebar settings', title: 'Settings' }
-    });
-    setIcon(cogBtn, 'settings');
-    cogBtn.onclick = () => {
-      this.plugin.app.setting.open();
-      this.plugin.app.setting.openTabById('cherrynik-audio-sidebar');
-    };
 
     this._bodyEl = content.createEl('div', { cls: 'audio-sb-body' });
     // Active players live here while the visible folder list is rebuilt.
@@ -496,12 +473,20 @@ class AudioSidebarView extends ItemView {
     this._nowPlayingListEl = this._footerEl.createEl('div', { cls: 'audio-sb-np-list' });
     this._upNextLabelEl = this._footerEl.createEl('div', { text: 'Up next', cls: 'audio-sb-footer-label audio-sb-up-next-label' });
     this._upNextListEl = this._footerEl.createEl('div', { cls: 'audio-sb-up-next-list' });
-    this.renderGlobalVolume(this._footerEl);
+    const playerSettings = this._footerEl.createEl('div', { cls: 'audio-sb-player-settings' });
+    this._loopBtn = playerSettings.createEl('button', {
+      cls: 'audio-sb-repeat-btn audio-sb-loop-off',
+      type: 'button',
+      attr: { 'aria-label': 'Repeat current track' }
+    });
+    this._loopBtn.createEl('span', { text: 'Repeat', cls: 'audio-sb-repeat-label' });
+    this._loopBtn.onclick = () => this.toggleLoop();
+    this.updateLoopButton();
+    this.renderGlobalVolume(playerSettings);
 
     if (this._nowPlayingTimer) window.clearInterval(this._nowPlayingTimer);
     this._nowPlayingTimer = window.setInterval(() => this._refreshNowPlayingTimes(), 500);
 
-    this._loopBtn = null;
     this._currentAudio = null;
     this._currentTrackName = '';
 
@@ -528,8 +513,9 @@ class AudioSidebarView extends ItemView {
     if (!this._loopBtn) return;
     this._loopBtn.empty();
     setIcon(this._loopBtn, 'repeat-2');
+    this._loopBtn.createEl('span', { text: 'Repeat', cls: 'audio-sb-repeat-label' });
     this._loopBtn.setAttribute('aria-pressed', String(this._looping));
-    this._loopBtn.title = this._looping ? 'Disable loop' : 'Enable loop';
+    this._loopBtn.title = this._looping ? 'Repeat is on' : 'Repeat is off';
   }
 
   updateOverlapButton() {
@@ -929,9 +915,26 @@ class AudioSidebarView extends ItemView {
     header.createEl('span', { text: folder.name || 'Root', cls: 'audio-sb-folder-name' });
     this._countEl = header.createEl('span', { text: `${audioFiles.length} track${audioFiles.length !== 1 ? 's' : ''}`, cls: 'audio-sb-count' });
     const headerActions = header.createEl('div', { cls: 'audio-sb-header-actions' });
-    this._loopBtn = headerActions.createEl('button', { cls: `audio-sb-loop-btn ${this._looping !== false ? 'audio-sb-loop-on' : 'audio-sb-loop-off'}` });
-    this._loopBtn.onclick = () => this.toggleLoop();
-    this.updateLoopButton();
+    const refreshBtn = headerActions.createEl('button', {
+      cls: 'audio-sb-cog-btn',
+      type: 'button',
+      attr: { 'aria-label': 'Refresh current folder', title: 'Refresh current folder' }
+    });
+    setIcon(refreshBtn, 'refresh-cw');
+    refreshBtn.onclick = () => {
+      this.loadFolder(folder);
+      new Notice(`${folder.name || 'Audio'} refreshed`);
+    };
+    const settingsBtn = headerActions.createEl('button', {
+      cls: 'audio-sb-cog-btn',
+      type: 'button',
+      attr: { 'aria-label': 'Audio Sidebar settings', title: 'Settings' }
+    });
+    setIcon(settingsBtn, 'settings');
+    settingsBtn.onclick = () => {
+      this.plugin.app.setting.open();
+      this.plugin.app.setting.openTabById('cherrynik-audio-sidebar');
+    };
     this._continueBtn = null;
     this._overlapBtn = null;
 

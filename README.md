@@ -13,6 +13,7 @@ The fork keeps the original audio features and adds:
 - automatic handoff from an audio player inside a note to the persistent Now Playing player.
 - a stable single-track Now Playing area with the remaining queue shown under Up Next.
 - one global volume control instead of a separate native volume control on every track.
+- folder refresh and settings live in the folder header; repeat is a clearly labelled player control.
 
 ## BRAT installation
 

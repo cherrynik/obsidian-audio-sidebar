@@ -33,12 +33,6 @@
   flex-direction: column;
 }
 
-.audio-sb-toolbar {
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--background-modifier-border);
-  flex: 0 0 auto;
-}
-
 .audio-sb-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -119,9 +113,34 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.audio-sb-player-settings {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-top: 10px;
   padding-top: 8px;
   border-top: 1px solid var(--background-modifier-border);
+}
+
+.audio-sb-repeat-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  min-height: 26px;
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.audio-sb-repeat-label {
+  font-size: 0.75em;
 }
 
 .audio-sb-global-volume-icon {
