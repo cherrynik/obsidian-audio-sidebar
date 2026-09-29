@@ -197,7 +197,7 @@
   block-size: 38px;
   width: 38px !important;
   height: 38px !important;
-  padding: 9px;
+  padding: 0;
   border: 0;
   border-radius: 50% !important;
   box-sizing: border-box;
@@ -208,24 +208,25 @@
   aspect-ratio: 1;
   flex: 0 0 38px;
   overflow: hidden;
-  -webkit-clip-path: circle(19px at 50% 50%);
-  clip-path: circle(19px at 50% 50%);
   transform: none !important;
   box-shadow: none !important;
   background: transparent !important;
   color: var(--text-on-accent);
   cursor: pointer;
 }
-.audio-sb-view button.audio-sb-main-play::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 0;
+.audio-sb-main-play-surface {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 9px;
   border-radius: 50%;
+  box-sizing: border-box;
   background: var(--interactive-accent);
+  color: var(--text-on-accent);
   pointer-events: none;
 }
-.audio-sb-view button.audio-sb-main-play > svg { position: relative; z-index: 1; }
 .audio-sb-view button.audio-sb-main-play:hover,
 .audio-sb-view button.audio-sb-main-play:active,
 .audio-sb-view button.audio-sb-main-play:focus,
@@ -235,16 +236,11 @@
   width: 38px !important;
   height: 38px !important;
   border-radius: 50% !important;
-  -webkit-clip-path: circle(19px at 50% 50%);
-  clip-path: circle(19px at 50% 50%);
   transform: none !important;
   color: var(--text-on-accent);
 }
 .audio-sb-view button.audio-sb-icon-btn.audio-sb-main-play:hover:not(:disabled) {
   background: transparent !important;
-}
-.audio-sb-view button.audio-sb-icon-btn.audio-sb-main-play:hover:not(:disabled)::before {
-  background: var(--interactive-accent);
 }
 .audio-sb-view button.audio-sb-icon-btn.audio-sb-main-play:active,
 .audio-sb-view button.audio-sb-icon-btn.audio-sb-main-play:focus,
@@ -467,3 +463,20 @@
 }
 .audio-sb-speed-popup[data-state='open'] { left: auto; bottom: auto; }
 .audio-sb-queue-popup[data-state='open'] { right: auto; bottom: auto; }
+
+/* Keep the primary transport control simple and immune to theme button states. */
+.audio-sb-view .audio-sb-footer .audio-sb-transport button.audio-sb-icon-btn.audio-sb-main-play,
+.audio-sb-view .audio-sb-footer .audio-sb-transport button.audio-sb-icon-btn.audio-sb-main-play:hover,
+.audio-sb-view .audio-sb-footer .audio-sb-transport button.audio-sb-icon-btn.audio-sb-main-play:active,
+.audio-sb-view .audio-sb-footer .audio-sb-transport button.audio-sb-icon-btn.audio-sb-main-play:focus,
+.audio-sb-view .audio-sb-footer .audio-sb-transport button.audio-sb-icon-btn.audio-sb-main-play:focus-visible {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+  max-width: 38px !important;
+  max-height: 38px !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  transform: none !important;
+}

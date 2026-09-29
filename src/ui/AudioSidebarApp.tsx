@@ -178,7 +178,9 @@ export function AudioSidebarApp({ controller, initialSnapshot }: {
       <div className="audio-sb-transport">
         <IconButton label="Repeat track" aria-pressed={state.repeat} className={`audio-sb-icon-btn${state.repeat ? ' is-active' : ''}`} onClick={controller.toggleRepeat}>{state.repeat ? <Repeat1 /> : <Repeat />}</IconButton>
         <IconButton label="Previous track" onClick={controller.playPrevious}><SkipBack /></IconButton>
-        <IconButton label={state.playing ? 'Pause' : 'Play'} className="audio-sb-icon-btn audio-sb-main-play" onClick={controller.togglePlayback}>{state.playing ? <Pause /> : <Play />}</IconButton>
+        <IconButton label={state.playing ? 'Pause' : 'Play'} className="audio-sb-icon-btn audio-sb-main-play" onClick={controller.togglePlayback}>
+          <span className="audio-sb-main-play-surface">{state.playing ? <Pause /> : <Play />}</span>
+        </IconButton>
         <IconButton label="Next track" onClick={controller.playNext}><SkipForward /></IconButton>
         <div className="audio-sb-speed-wrap" onMouseEnter={() => controller.toggleSpeed?.(true)} onMouseLeave={() => controller.toggleSpeed?.(false)}>
           <Popover.Root open={state.speedOpen} onOpenChange={open => controller.toggleSpeed?.(open)}>
