@@ -111,6 +111,7 @@
   overflow: hidden;
   color: var(--text-muted);
   font-size: var(--font-smallest);
+  line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -232,7 +233,7 @@
 .audio-sb-media { min-width: 0; }
 .audio-sb-media .plyr--audio .plyr__controls {
   display: grid;
-  grid-template-columns: 38px minmax(72px, 1fr) 38px minmax(90px, 112px) 30px;
+  grid-template-columns: 38px minmax(108px, 1.5fr) 38px minmax(78px, .75fr) 30px;
   align-items: center;
   gap: 4px;
   padding: 0;
@@ -268,7 +269,7 @@
   height: 12px !important;
   min-width: 12px !important;
   min-height: 12px !important;
-  margin-top: 0 !important;
+  margin-top: 2px !important;
   border-radius: 50% !important;
   aspect-ratio: 1;
 }

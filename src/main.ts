@@ -1,4 +1,4 @@
-import { ItemView, Notice, Plugin, TFile, TFolder, setIcon, type TAbstractFile, type WorkspaceLeaf } from 'obsidian';
+import { ItemView, Menu, Notice, Plugin, TFile, TFolder, setIcon, type TAbstractFile, type WorkspaceLeaf } from 'obsidian';
 // @ts-expect-error Plyr's published declaration mixes export= with a default export.
 import Plyr from 'plyr';
 import plyrIcons from '../node_modules/plyr/dist/plyr.svg';
@@ -160,6 +160,31 @@ class AudioSidebarView extends ItemView {
       probe.preload = 'metadata';
       probe.src = this.app.vault.getResourcePath(file);
       probe.addEventListener('loadedmetadata', () => { duration.textContent = formatTime(probe.duration); }, { once: true });
+      row.addEventListener('dblclick', event => {
+        if ((event.target as Element | null)?.closest('button')) return;
+        if (this.plugin.player.file?.path === file.path) {
+          if (!this.plugin.player.playing) this.plugin.player.resume();
+          return;
+        }
+        this.plugin.player.play(file, files.map(item => item.path), this.folder?.name || 'Audio');
+      });
+      row.addEventListener('contextmenu', event => {
+        event.preventDefault();
+        const isCurrent = this.plugin.player.file?.path === file.path;
+        const menu = new Menu();
+        menu.addItem(item => item
+          .setTitle(isCurrent && this.plugin.player.playing ? 'Pause' : 'Play')
+          .setIcon(isCurrent && this.plugin.player.playing ? 'pause' : 'play')
+          .onClick(() => {
+            if (isCurrent) this.plugin.player.toggle();
+            else this.plugin.player.play(file, files.map(entry => entry.path), this.folder?.name || 'Audio');
+          }));
+        menu.addItem(item => item
+          .setTitle('Show in Files')
+          .setIcon('folder-search')
+          .onClick(() => void this.plugin.revealFile(file)));
+        menu.showAtMouseEvent(event);
+      });
     }
     this.filterRows();
     this.updateTrackList();
@@ -478,6 +503,9 @@ export default class AudioSidebarPlugin extends Plugin {
   async revealCurrentFile(): Promise<void> {
     const file = this.player.file;
     if (!file) return;
+    await this.revealFile(file);
+  }
+  async revealFile(file: TFile): Promise<void> {
     await this.app.workspace.getLeaf(false).openFile(file);
     await (this.app as unknown as { commands: { executeCommandById(id: string): Promise<boolean> | boolean } })
       .commands.executeCommandById('file-explorer:reveal-active-file');
