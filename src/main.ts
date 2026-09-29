@@ -549,9 +549,15 @@ export default class AudioSidebarPlugin extends Plugin {
     await this.revealFile(file);
   }
   async revealFile(file: TFile): Promise<void> {
+    this.selectFileInExplorer(file.path);
     await this.app.workspace.getLeaf(false).openFile(file);
     await (this.app as unknown as { commands: { executeCommandById(id: string): Promise<boolean> | boolean } })
       .commands.executeCommandById('file-explorer:reveal-active-file');
+    this.selectFileInExplorer(file.path);
+    requestAnimationFrame(() => this.selectFileInExplorer(file.path));
+  }
+  private selectFileInExplorer(path: string): void {
+    window.dispatchEvent(new CustomEvent('cherrynik:explorer-select-path', { detail: { path } }));
   }
   private async activateView(): Promise<void> {
     const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE);
