@@ -227,6 +227,15 @@
   display: none;
 }
 
+.audio-sb-control-popup::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -10px;
+  left: 0;
+  height: 10px;
+}
+
 .audio-sb-control-label,
 .audio-sb-global-volume-value,
 .audio-sb-speed-value {
@@ -236,12 +245,25 @@
   white-space: nowrap;
 }
 
-.audio-sb-vertical-slider {
-  width: 22px;
-  height: 110px;
-  margin: 0;
-  writing-mode: vertical-lr;
-  direction: rtl;
+.audio-sb-vertical-slider-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 120px;
+  width: 28px;
+  height: 120px;
+}
+
+input.audio-sb-vertical-slider {
+  display: block;
+  flex: 0 0 auto;
+  width: 110px !important;
+  min-width: 110px !important;
+  max-width: 110px !important;
+  height: 22px !important;
+  margin: 0 !important;
+  transform: rotate(-90deg);
+  transform-origin: center;
 }
 
 .audio-sb-np-empty {

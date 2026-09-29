@@ -15,7 +15,7 @@ The fork keeps the original audio features and adds:
 - one global volume control instead of a separate native volume control on every track.
 - folder refresh and settings live in the folder header; repeat is a clearly labelled player control.
 - pausing preserves the current track, playback position, and queue until Stop is pressed.
-- repeat-one explicitly restarts the current track; a full-width timeline seeks through it, while volume and playback speed use compact vertical controls.
+- repeat-one explicitly restarts the current track; a full-width timeline seeks through it, while queue, volume, and playback speed open on hover and close outside. Touch devices can open them by tapping.
 
 ## BRAT installation
 

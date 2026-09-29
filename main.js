@@ -461,6 +461,7 @@ class AudioSidebarView extends ItemView {
   draw(folder) {
     this._looping = this._looping === true;
     this._suppressPauseSync = false;
+    if (this._outsidePopoverHandler) document.removeEventListener('pointerdown', this._outsidePopoverHandler);
     const content = this.containerEl.children[1];
     content.empty();
     content.addClass('audio-sb-view');
@@ -485,6 +486,10 @@ class AudioSidebarView extends ItemView {
     this.renderQueueControl(playerSettings);
     this.renderGlobalVolume(playerSettings);
     this.renderPlaybackSpeed(playerSettings);
+    this._outsidePopoverHandler = event => {
+      if (!event.target.closest('.audio-sb-control-wrap')) this.closePlayerPopovers();
+    };
+    document.addEventListener('pointerdown', this._outsidePopoverHandler);
 
     if (this._nowPlayingTimer) window.clearInterval(this._nowPlayingTimer);
     this._nowPlayingTimer = window.setInterval(() => this._refreshNowPlayingTimes(), 500);
@@ -512,7 +517,7 @@ class AudioSidebarView extends ItemView {
     if (!this._loopBtn) return;
     this._loopBtn.empty();
     setIcon(this._loopBtn, this._looping ? 'repeat-1' : 'repeat-2');
-    this._loopBtn.createEl('span', { text: this._looping ? 'Repeat 1' : 'Repeat', cls: 'audio-sb-repeat-label' });
+    this._loopBtn.createEl('span', { text: 'Repeat', cls: 'audio-sb-repeat-label' });
     this._loopBtn.setAttribute('aria-pressed', String(this._looping));
     this._loopBtn.title = this._looping ? 'Repeat current track: on' : 'Repeat current track: off';
     this._loopBtn.classList.toggle('audio-sb-loop-on', this._looping);
@@ -711,20 +716,49 @@ class AudioSidebarView extends ItemView {
     });
     setIcon(button, iconName);
     const popup = wrap.createEl('div', { cls: 'audio-sb-control-popup audio-sb-hidden' });
-    button.onclick = () => {
-      const opening = popup.classList.contains('audio-sb-hidden');
-      this._footerEl.querySelectorAll('.audio-sb-control-popup').forEach(other => other.classList.add('audio-sb-hidden'));
-      this._footerEl.querySelectorAll('.audio-sb-control-btn').forEach(other => other.setAttribute('aria-expanded', 'false'));
-      popup.classList.toggle('audio-sb-hidden', !opening);
-      button.setAttribute('aria-expanded', String(opening));
+    const cancelClose = () => {
+      if (this._popoverCloseTimer) window.clearTimeout(this._popoverCloseTimer);
+      this._popoverCloseTimer = null;
     };
+    const scheduleClose = () => {
+      cancelClose();
+      this._popoverCloseTimer = window.setTimeout(() => this.closePlayerPopovers(), 300);
+    };
+    wrap.addEventListener('pointerenter', event => {
+      if (event.pointerType === 'mouse') this.showPlayerPopover(popup);
+    });
+    wrap.addEventListener('pointerleave', event => {
+      if (event.pointerType === 'mouse') scheduleClose();
+    });
+    popup.addEventListener('pointerenter', cancelClose);
+    popup.addEventListener('pointerleave', event => {
+      if (event.pointerType === 'mouse') scheduleClose();
+    });
+    button.onclick = () => this.showPlayerPopover(popup);
+    button.addEventListener('keydown', event => {
+      if (event.key === 'Escape') this.closePlayerPopovers();
+    });
     return popup;
+  }
+
+  showPlayerPopover(popup) {
+    if (this._popoverCloseTimer) window.clearTimeout(this._popoverCloseTimer);
+    this._popoverCloseTimer = null;
+    this.closePlayerPopovers();
+    popup.classList.remove('audio-sb-hidden');
+    popup.parentElement.querySelector('button')?.setAttribute('aria-expanded', 'true');
+  }
+
+  closePlayerPopovers() {
+    this._footerEl?.querySelectorAll('.audio-sb-control-popup').forEach(other => other.classList.add('audio-sb-hidden'));
+    this._footerEl?.querySelectorAll('.audio-sb-control-btn').forEach(other => other.setAttribute('aria-expanded', 'false'));
   }
 
   renderGlobalVolume(parentEl) {
     const popup = this.createPlayerPopover(parentEl, 'volume-2', 'Volume');
     popup.createEl('span', { text: 'Volume', cls: 'audio-sb-control-label' });
-    const input = popup.createEl('input', {
+    const sliderShell = popup.createEl('div', { cls: 'audio-sb-vertical-slider-shell' });
+    const input = sliderShell.createEl('input', {
       cls: 'audio-sb-vertical-slider', type: 'range',
       attr: { min: '0', max: '100', step: '1', 'aria-label': 'Global volume' }
     });
@@ -743,7 +777,8 @@ class AudioSidebarView extends ItemView {
   renderPlaybackSpeed(parentEl) {
     const popup = this.createPlayerPopover(parentEl, 'gauge', 'Playback speed');
     popup.createEl('span', { text: 'Speed', cls: 'audio-sb-control-label' });
-    const input = popup.createEl('input', {
+    const sliderShell = popup.createEl('div', { cls: 'audio-sb-vertical-slider-shell' });
+    const input = sliderShell.createEl('input', {
       cls: 'audio-sb-vertical-slider', type: 'range',
       attr: { min: '0.5', max: '2', step: '0.05', 'aria-label': 'Playback speed' }
     });
@@ -767,7 +802,7 @@ class AudioSidebarView extends ItemView {
     this._queuePopup = popup;
     this._queueListEl = popup.createEl('div', { cls: 'audio-sb-queue-list' });
     this._queueButton = popup.parentElement.querySelector('button');
-    this._queueButton.addEventListener('click', () => {
+    this._queueButton.addEventListener('pointerenter', () => {
       if (!popup.classList.contains('audio-sb-hidden')) {
         const current = this._queueListEl.querySelector('.audio-sb-queue-current');
         if (current) popup.scrollTop = Math.max(0, current.offsetTop - popup.clientHeight / 2);
@@ -1367,6 +1402,8 @@ class AudioSidebarView extends ItemView {
   }
 
   async onClose() {
+    if (this._outsidePopoverHandler) document.removeEventListener('pointerdown', this._outsidePopoverHandler);
+    if (this._popoverCloseTimer) window.clearTimeout(this._popoverCloseTimer);
     if (this._nowPlayingTimer) {
       window.clearInterval(this._nowPlayingTimer);
       this._nowPlayingTimer = null;
