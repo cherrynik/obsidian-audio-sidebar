@@ -263,6 +263,15 @@
 }
 .audio-sb-view button.audio-sb-speed:hover { background: transparent !important; color: var(--text-normal); }
 .audio-sb-speed-wrap { position: relative; display: flex; align-items: center; }
+.audio-sb-speed-wrap[data-open='true']::before {
+  content: '';
+  position: absolute;
+  z-index: 31;
+  left: -12px;
+  bottom: 100%;
+  width: calc(100% + 24px);
+  height: 10px;
+}
 .audio-sb-speed-popup {
   position: absolute;
   z-index: 32;
@@ -281,8 +290,6 @@
   transform: translate(-50%, 3px);
   transition: opacity 90ms ease, transform 90ms ease, visibility 90ms;
 }
-.audio-sb-speed-wrap:hover .audio-sb-speed-popup,
-.audio-sb-speed-wrap:focus-within .audio-sb-speed-popup { opacity: 1; visibility: visible; pointer-events: auto; transform: translate(-50%, 0); }
 .audio-sb-view button.audio-sb-speed-option {
   height: 28px;
   padding: 0 9px;

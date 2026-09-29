@@ -40,6 +40,7 @@ const controller = (state = snapshot()): AudioSidebarController => ({
   toggleRepeat: vi.fn(),
   setRate: vi.fn(),
   toggleQueue: vi.fn(),
+  toggleSpeed: vi.fn(),
   closePlayer: vi.fn(),
   focusCurrentTrack: vi.fn(),
   revealCurrentFile: vi.fn(),
@@ -152,6 +153,15 @@ describe('AudioSidebarApp', () => {
     await userEvent.click(screen.getByRole('button', { name: '1.5×' }));
     expect(controlsWithOpenMenus.playTrack).toHaveBeenCalledWith(tracks[1].path);
     expect(controlsWithOpenMenus.setRate).toHaveBeenCalledWith(1.5);
+  });
+
+  it('opens playback speed only from its trigger and keeps it open over the popup', () => {
+    const controls = controller();
+    const { container } = render(<AudioSidebarApp controller={controls} initialSnapshot={snapshot()} />);
+    fireEvent.mouseEnter(container.querySelector('.audio-sb-speed-wrap')!);
+    expect(controls.toggleSpeed).not.toHaveBeenCalled();
+    fireEvent.mouseEnter(screen.getByRole('button', { name: '1×' }));
+    expect(controls.toggleSpeed).toHaveBeenCalledWith(true);
   });
 
   it('opens the playback queue only from its trigger', () => {
