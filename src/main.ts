@@ -47,10 +47,15 @@ class AudioSidebarView extends ItemView {
   private updateVolumeIcon = (): void => {
     if (!this.muteButton) return;
     const muted = this.plugin.player.audio.muted || this.plugin.player.audio.volume === 0;
-    this.muteButton.empty();
-    setIcon(this.muteButton, muted ? 'volume-x' : 'volume-2');
-    this.muteButton.setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
+    this.setButtonIcon(this.muteButton, muted ? 'volume-x' : 'volume-2', muted ? 'Unmute' : 'Mute');
   };
+
+  private setButtonIcon(button: HTMLButtonElement, icon: string, label: string): void {
+    button.empty();
+    button.removeAttribute('aria-label');
+    setIcon(button, icon);
+    button.createSpan({ text: label, cls: 'audio-sb-sr-only' });
+  }
 
   constructor(leaf: WorkspaceLeaf, private readonly plugin: AudioSidebarPlugin) { super(leaf); }
   getViewType(): string { return VIEW_TYPE; }
@@ -71,8 +76,7 @@ class AudioSidebarView extends ItemView {
     this.artist = currentMeta.createSpan({ cls: 'audio-sb-current-artist' });
     this.location = currentMeta.createEl('button', {
       cls: 'audio-sb-current-location',
-      type: 'button',
-      attr: { 'aria-label': 'Show current track in Files' }
+      type: 'button'
     });
     this.location.addEventListener('click', () => void this.plugin.revealCurrentFile());
     this.iconButton(currentTrack, 'x', 'Close player', () => this.plugin.player.stop()).addClass('audio-sb-close-player');
@@ -204,9 +208,7 @@ class AudioSidebarView extends ItemView {
       const button = row.querySelector<HTMLButtonElement>('.audio-sb-track-play');
       if (!button) return;
       const playing = active && this.plugin.player.playing;
-      button.empty();
-      setIcon(button, playing ? 'pause' : 'play');
-      button.setAttribute('aria-label', `${playing ? 'Pause' : 'Play'} ${row.querySelector('.audio-sb-track-title')?.textContent || ''}`);
+      this.setButtonIcon(button, playing ? 'pause' : 'play', `${playing ? 'Pause' : 'Play'} ${row.querySelector('.audio-sb-track-title')?.textContent || ''}`);
     });
   }
 
@@ -230,12 +232,11 @@ class AudioSidebarView extends ItemView {
 
   private updateTransport(): void {
     if (!this.repeatButton || !this.speedButton) return;
-    this.repeatButton.empty();
-    setIcon(this.repeatButton, this.plugin.player.audio.loop ? 'repeat-1' : 'repeat-2');
+    this.setButtonIcon(this.repeatButton, this.plugin.player.audio.loop ? 'repeat-1' : 'repeat-2', 'Repeat track');
     this.repeatButton.toggleClass('is-active', this.plugin.player.audio.loop);
     this.repeatButton.setAttribute('aria-pressed', String(this.plugin.player.audio.loop));
     this.speedButton.textContent = `${this.plugin.player.rate}×`;
-    this.speedButton.setAttribute('aria-label', `Playback speed ${this.plugin.player.rate} times`);
+    this.speedButton.removeAttribute('aria-label');
     this.speedPopup?.querySelectorAll<HTMLElement>('.audio-sb-speed-option').forEach(option => {
       option.toggleClass('is-active', option.textContent === `${this.plugin.player.rate}×`);
     });
@@ -244,10 +245,9 @@ class AudioSidebarView extends ItemView {
   private iconButton(parent: HTMLElement, icon: string, label: string, action: () => void): HTMLButtonElement {
     const button = parent.createEl('button', {
       cls: 'audio-sb-icon-btn',
-      type: 'button',
-      attr: { 'aria-label': label }
+      type: 'button'
     });
-    setIcon(button, icon);
+    this.setButtonIcon(button, icon, label);
     button.addEventListener('click', action);
     return button;
   }
