@@ -1218,6 +1218,7 @@ class AudioSidebarView extends ItemView {
     this.renderQueue();
     this.updateTimeline();
     this.updateTrackListState();
+    this.plugin.updateMediaSession(this._currentAudio);
   }
 
   renderQueue() {
@@ -1591,6 +1592,64 @@ class AudioSidebarSettingTab extends PluginSettingTab {
 // ─── Plugin ───────────────────────────────────────────────────────────────────
 
 class AudioSidebarPlugin extends Plugin {
+  getPlayingView() {
+    const views = this.app.workspace.getLeavesOfType(VIEW_TYPE)
+      .map(leaf => leaf.view)
+      .filter(view => view instanceof AudioSidebarView);
+    return views.find(view => view._currentAudio) || views[0] || null;
+  }
+
+  skipTrack(offset) {
+    const view = this.getPlayingView();
+    if (view?._currentAudio) view.playRelativeTrack(view._currentAudio, offset);
+  }
+
+  updateMediaSession(audio) {
+    const session = navigator.mediaSession;
+    if (!session) return;
+    if (!audio) {
+      audio = this.getPlayingView()?._currentAudio;
+      if (!audio) {
+        this.clearMediaSession();
+        return;
+      }
+    }
+    this._mediaSessionOwned = true;
+    const title = audio.dataset.trackName || 'Audio';
+    if (typeof MediaMetadata !== 'undefined' && session.metadata?.title !== title) {
+      session.metadata = new MediaMetadata({ title, artist: 'CherryNIK Audio Sidebar' });
+    }
+    session.playbackState = audio.paused ? 'paused' : 'playing';
+    const actions = {
+      nexttrack: () => this.skipTrack(1),
+      previoustrack: () => this.skipTrack(-1),
+      play: () => {
+        const view = this.getPlayingView();
+        if (view?._currentAudio?.paused) view.fadeInTrack(view._currentAudio).catch(() => {});
+      },
+      pause: () => {
+        const view = this.getPlayingView();
+        if (view?._currentAudio && !view._currentAudio.paused) {
+          view.fadeOutAndStop(view._currentAudio, { resetTime: false, preserveSelection: true });
+        }
+      }
+    };
+    for (const [action, handler] of Object.entries(actions)) {
+      try { session.setActionHandler(action, handler); } catch (_) { /* Unsupported on this device. */ }
+    }
+  }
+
+  clearMediaSession() {
+    const session = navigator.mediaSession;
+    if (!session || !this._mediaSessionOwned) return;
+    for (const action of ['nexttrack', 'previoustrack', 'play', 'pause']) {
+      try { session.setActionHandler(action, null); } catch (_) { /* Unsupported on this device. */ }
+    }
+    session.playbackState = 'none';
+    session.metadata = null;
+    this._mediaSessionOwned = false;
+  }
+
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
   }
@@ -2058,6 +2117,15 @@ class AudioSidebarPlugin extends Plugin {
     this._activeLoops = new Map();
     this.registerView(VIEW_TYPE, (leaf) => new AudioSidebarView(leaf, this));
     this.registerDomEvent(this.app.workspace.containerEl, 'play', event => this.handleNativeAudioPlay(event), true);
+    this.registerDomEvent(window, 'keydown', event => {
+      if (event.key === 'MediaTrackNext') {
+        event.preventDefault();
+        this.skipTrack(1);
+      } else if (event.key === 'MediaTrackPrevious') {
+        event.preventDefault();
+        this.skipTrack(-1);
+      }
+    });
     this.addSettingTab(new AudioSidebarSettingTab(this.app, this));
     this.addRibbonIcon('music', 'Audio Sidebar', () => this.activateView());
     this.app.workspace.onLayoutReady(() => {
@@ -2314,6 +2382,18 @@ class AudioSidebarPlugin extends Plugin {
     });
 
     this.addCommand({
+      id: 'next-track',
+      name: 'Play next track',
+      callback: () => this.skipTrack(1)
+    });
+
+    this.addCommand({
+      id: 'previous-track',
+      name: 'Play previous track',
+      callback: () => this.skipTrack(-1)
+    });
+
+    this.addCommand({
       id: 'load-current-folder',
       name: 'Load audio from current note\'s folder',
       callback: () => {
@@ -2380,6 +2460,7 @@ class AudioSidebarPlugin extends Plugin {
   }
 
   onunload() {
+    this.clearMediaSession();
     this.stopAllSfx();
     this.stopAllLoops();
     this.app.workspace.detachLeavesOfType(VIEW_TYPE);

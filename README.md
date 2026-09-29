@@ -9,6 +9,7 @@ The fork keeps the original audio features and adds:
 - a persistent player that always continues while changing folders and notes.
 - a compact native-player interface with icon-only controls.
 - previous and next controls that keep the active folder queue while browsing.
+- macOS media keys and assignable Obsidian commands for previous/next track.
 - stable folder selection that ignores repeated clicks and disclosure toggles.
 - automatic handoff from an audio player inside a note to the persistent Now Playing player.
 - a stable single-track Now Playing area and a compact queue button showing previous, current, and upcoming tracks from the folder where playback started.
