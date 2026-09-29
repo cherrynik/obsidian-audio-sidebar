@@ -18,6 +18,14 @@ The fork keeps the original audio features and adds:
 - pausing preserves the current track, playback position, and queue until Stop is pressed.
 - repeat-one explicitly restarts the current track; a full-width timeline seeks through it, while queue, volume, and playback speed open on hover and close outside. The vertical controls use slim filled tracks with a thumb shown on hover; touch devices can open them by tapping.
 
+## Playback and development
+
+The audio plugin is independent of [CherryNIK Explorer Shortcuts](https://github.com/cherrynik/obsidian-explorer-shortcuts), which only changes keyboard behavior in Obsidian's Files panel. Audio-specific media keys and track commands stay here.
+
+[Howler.js](https://github.com/goldfire/howler.js) now runs sound effects and ambient loops, including fades and volume. Music tracks continue to use streaming HTML5 Audio so large files are not decoded fully into memory. The compact sidebar interface and source-folder queue remain in this plugin.
+
+Source lives in `src/`; `main.js` is the bundled BRAT release artifact. Run `npm ci && npm run check` before publishing. The Howler MIT license is included in the generated bundle.
+
 ## BRAT installation
 
 Add `cherrynik/obsidian-audio-sidebar` in BRAT after the first GitHub release is published.
