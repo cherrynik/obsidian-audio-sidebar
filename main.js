@@ -754,6 +754,14 @@ class AudioSidebarView extends ItemView {
     this._footerEl?.querySelectorAll('.audio-sb-control-btn').forEach(other => other.setAttribute('aria-expanded', 'false'));
   }
 
+  updateVerticalSliderFill(input) {
+    const min = Number(input.min);
+    const max = Number(input.max);
+    const value = Number(input.value);
+    const percent = max > min ? ((value - min) / (max - min)) * 100 : 0;
+    input.style.setProperty('--audio-sb-slider-progress', `${Math.max(0, Math.min(100, percent))}%`);
+  }
+
   renderGlobalVolume(parentEl) {
     const popup = this.createPlayerPopover(parentEl, 'volume-2', 'Volume');
     popup.createEl('span', { text: 'Volume', cls: 'audio-sb-control-label' });
@@ -763,10 +771,12 @@ class AudioSidebarView extends ItemView {
       attr: { min: '0', max: '100', step: '1', 'aria-label': 'Global volume' }
     });
     input.value = String(this.plugin.settings.masterVolume);
+    this.updateVerticalSliderFill(input);
     const value = popup.createEl('span', {
       text: `${this.plugin.settings.masterVolume}%`, cls: 'audio-sb-global-volume-value'
     });
     input.addEventListener('input', () => {
+      this.updateVerticalSliderFill(input);
       value.textContent = `${input.value}%`;
       this.plugin.previewVolumeSetting('masterVolume', Number(input.value));
     });
@@ -786,6 +796,7 @@ class AudioSidebarView extends ItemView {
     const value = popup.createEl('span', { cls: 'audio-sb-speed-value' });
     const update = () => {
       const speed = this.plugin.clampPlaybackRate(input.value);
+      this.updateVerticalSliderFill(input);
       value.textContent = `${speed.toFixed(2).replace(/0$/, '').replace(/\.0$/, '')}×`;
       this.plugin.settings.playbackRate = speed;
       this.getTrackAudios().forEach(audio => { audio.playbackRate = speed; });
@@ -822,7 +833,9 @@ class AudioSidebarView extends ItemView {
     for (const [input, value] of controls) {
       if (!input) continue;
       input.value = String(value);
-      const valueEl = input.parentElement?.querySelector('.audio-sb-volume-value, .audio-sb-global-volume-value');
+      if (input.classList.contains('audio-sb-vertical-slider')) this.updateVerticalSliderFill(input);
+      const valueEl = input.closest('.audio-sb-control-popup, .audio-sb-volume-control')?.querySelector('.audio-sb-volume-value, .audio-sb-global-volume-value')
+        || input.parentElement?.querySelector('.audio-sb-volume-value');
       if (valueEl) valueEl.textContent = `${value}%`;
     }
   }
