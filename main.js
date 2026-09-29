@@ -556,17 +556,50 @@ class AudioSidebarView extends ItemView {
   }
 
   playNextTrack(afterAudio) {
-    if (!this._trackList) return;
-    const visibleAudios = Array.from(this._trackList.querySelectorAll('.audio-sb-item'))
+    this.playRelativeTrack(afterAudio, 1);
+  }
+
+  getVisibleQueue() {
+    if (!this._trackList) return [];
+    return Array.from(this._trackList.querySelectorAll('.audio-sb-item'))
       .filter(item => !item.classList.contains('audio-sb-hidden'))
-      .map(item => item.querySelector('audio'))
+      .map(item => item.querySelector('audio')?.dataset.trackPath)
       .filter(Boolean);
-    const idx = visibleAudios.indexOf(afterAudio);
-    if (idx === -1 || idx >= visibleAudios.length - 1) return;
-    const next = visibleAudios[idx + 1];
-    next.currentTime = 0;
-    this.fadeInTrack(next).catch(() => {
-      new Notice(`Could not play ${next.dataset.trackName || 'track'}`);
+  }
+
+  createDetachedTrack(path) {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile) || !this._persistentAudioEl) return null;
+    const audio = this._persistentAudioEl.createEl('audio');
+    this.configureTrackAudio(audio, file);
+    if (!this._detachedAudios) this._detachedAudios = new Set();
+    this._detachedAudios.add(audio);
+    return audio;
+  }
+
+  playRelativeTrack(fromAudio, offset) {
+    const currentPath = fromAudio?.dataset.trackPath;
+    let queue = this._playQueuePaths?.length ? this._playQueuePaths : this.getVisibleQueue();
+    if (!queue.length) return;
+
+    let index = queue.indexOf(currentPath);
+    if (index === -1) {
+      queue = this.getVisibleQueue();
+      index = offset > 0 ? -1 : 0;
+    }
+    if (!queue.length) return;
+
+    const targetPath = queue[(index + offset + queue.length) % queue.length];
+    let target = this.getTrackAudios().find(audio => audio.dataset.trackPath === targetPath);
+    if (!target) target = this.createDetachedTrack(targetPath);
+    if (!target || target === fromAudio) {
+      if (target) target.currentTime = 0;
+      return;
+    }
+
+    target.currentTime = 0;
+    this.fadeInTrack(target).catch(() => {
+      new Notice(`Could not play ${target.dataset.trackName || 'track'}`);
     });
   }
 
@@ -805,6 +838,8 @@ class AudioSidebarView extends ItemView {
   // Handles crossfading out other tracks and fading the new one in.
   handleTrackPlay(audio, trackName) {
     audio.dataset.lastStarted = String(Date.now());
+    const visibleQueue = this.getVisibleQueue();
+    if (visibleQueue.includes(audio.dataset.trackPath)) this._playQueuePaths = visibleQueue;
     const otherPlayingAudios = this.getTrackAudios().filter(a => a !== audio && !a.paused && !a.ended);
 
     if (!this.plugin.settings.allowMusicOverlap) {
@@ -881,12 +916,18 @@ class AudioSidebarView extends ItemView {
 
       const playerRow = item.createEl('div', { cls: 'audio-sb-player-row' });
       const audio = playerRow.createEl('audio');
+      this.configureTrackAudio(audio, af);
+    }
+  }
+
+  configureTrackAudio(audio, af) {
       audio.controls = true;
       audio.loop = this._looping !== false;
       audio.src = this.app.vault.getResourcePath(af);
       audio.dataset.fadeLevel = '1';
-      this.applyAudioVolume(audio);
       audio.dataset.trackName = af.basename;
+      audio.dataset.trackPath = af.path;
+      this.applyAudioVolume(audio);
       audio.addEventListener('play', () => {
         this.handleTrackPlay(audio, af.basename);
       });
@@ -919,8 +960,6 @@ class AudioSidebarView extends ItemView {
           this.updateNowPlaying();
         }
       });
-
-    }
   }
 
   updateNowPlaying() {
@@ -961,6 +1000,16 @@ class AudioSidebarView extends ItemView {
 
     const controls = row.createEl('div', { cls: 'audio-sb-np-controls' });
 
+    if (type === 'music') {
+      const previousBtn = controls.createEl('button', {
+        cls: 'audio-sb-np-btn',
+        type: 'button',
+        attr: { 'aria-label': 'Previous track', title: 'Previous track' }
+      });
+      setIcon(previousBtn, 'skip-back');
+      previousBtn.onclick = () => this.playRelativeTrack(audio, -1);
+    }
+
     if (type !== 'sfx') {
       const isPlaying = !audio.paused;
       const playBtn = controls.createEl('button', {
@@ -979,6 +1028,16 @@ class AudioSidebarView extends ItemView {
         }
         this.updateNowPlaying();
       };
+    }
+
+    if (type === 'music') {
+      const nextBtn = controls.createEl('button', {
+        cls: 'audio-sb-np-btn',
+        type: 'button',
+        attr: { 'aria-label': 'Next track', title: 'Next track' }
+      });
+      setIcon(nextBtn, 'skip-forward');
+      nextBtn.onclick = () => this.playRelativeTrack(audio, 1);
     }
 
     const stopBtn = controls.createEl('button', {
