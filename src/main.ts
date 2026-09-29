@@ -439,10 +439,6 @@ export default class AudioSidebarPlugin extends Plugin {
     const fileExplorerFolder = target?.closest('.nav-folder-title') as HTMLElement | null;
     const path = fileExplorerFolder?.dataset.path ?? (target?.closest('.nv-row') as HTMLElement | null)?.dataset.key;
     if (!path || (path !== 'Audio' && !path.startsWith('Audio/'))) return;
-    if (fileExplorerFolder) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
     const folder = this.app.vault.getAbstractFileByPath(path);
     if (!(folder instanceof TFolder)) return;
     this.selectedFolder = folder;
