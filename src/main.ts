@@ -263,6 +263,7 @@ export default class AudioSidebarPlugin extends Plugin {
   private playerSettings = { volume: 1, rate: 1 };
   private mediaSessionOwned = false;
   private nativeMirrors = new Set<HTMLAudioElement>();
+  private nativeMirrorSyncUntil = new WeakMap<HTMLAudioElement, number>();
 
   async onload(): Promise<void> {
     const saved = await this.loadData() || {};
@@ -286,6 +287,9 @@ export default class AudioSidebarPlugin extends Plugin {
     this.registerDomEvent(this.app.workspace.containerEl, 'pause', event => this.handleNativePause(event), true);
     this.registerDomEvent(this.app.workspace.containerEl, 'seeking', event => this.handleNativeSeek(event), true);
     this.registerDomEvent(this.app.workspace.containerEl, 'click', event => this.followFolderClick(event), true);
+    this.registerEvent(this.app.workspace.on('file-open', file => {
+      if (file instanceof TFile && AUDIO_EXTENSIONS.has(file.extension.toLowerCase())) this.attachNativeMirror(file);
+    }));
     this.registerEvent(this.app.vault.on('create', file => {
       if (file instanceof TFile && AUDIO_EXTENSIONS.has(file.extension.toLowerCase())) this.refreshFolderViews();
     }));
@@ -352,10 +356,44 @@ export default class AudioSidebarPlugin extends Plugin {
       if (!mirror.isConnected) { this.nativeMirrors.delete(mirror); continue; }
       mirror.muted = true;
       mirror.playbackRate = this.player.rate;
-      if (Math.abs(mirror.currentTime - this.player.position) > 0.35) mirror.currentTime = this.player.position;
-      if (this.player.wantsPlayback && mirror.paused) void mirror.play().catch(() => undefined);
-      else if (!this.player.wantsPlayback && !mirror.paused) mirror.pause();
+      if (mirror.readyState >= HTMLMediaElement.HAVE_METADATA && Math.abs(mirror.currentTime - this.player.position) > 0.35) {
+        this.markNativeMirrorSync(mirror);
+        mirror.currentTime = Math.min(this.player.position, Math.max(0, mirror.duration - 0.05));
+      }
+      if (this.player.wantsPlayback && mirror.paused && mirror.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        this.markNativeMirrorSync(mirror);
+        void mirror.play().catch(() => undefined);
+      }
+      else if (!this.player.wantsPlayback && !mirror.paused) {
+        this.markNativeMirrorSync(mirror);
+        mirror.pause();
+      }
     }
+  }
+  private markNativeMirrorSync(audio: HTMLAudioElement, duration = 500): void {
+    this.nativeMirrorSyncUntil.set(audio, performance.now() + duration);
+  }
+  private isNativeMirrorSyncing(audio: HTMLAudioElement): boolean {
+    return performance.now() < (this.nativeMirrorSyncUntil.get(audio) ?? 0);
+  }
+  private attachNativeMirror(file: TFile): void {
+    const attach = (attempt: number): void => {
+      if (this.player.file?.path !== file.path) return;
+      let attached = false;
+      const activeView = this.app.workspace.activeLeaf?.view.containerEl ?? this.app.workspace.containerEl;
+      for (const audio of activeView.querySelectorAll<HTMLAudioElement>('audio')) {
+        if (audio.closest('.audio-sb-view')) continue;
+        this.nativeMirrors.add(audio);
+        this.markNativeMirrorSync(audio, 1000);
+        audio.muted = true;
+        audio.addEventListener('loadedmetadata', () => this.syncNativeMirrors(), { once: true });
+        audio.addEventListener('canplay', () => this.syncNativeMirrors(), { once: true });
+        attached = true;
+      }
+      this.syncNativeMirrors();
+      if (!attached && attempt < 8) window.setTimeout(() => attach(attempt + 1), 100 * (attempt + 1));
+    };
+    window.setTimeout(() => attach(0), 0);
   }
   private updateMediaSession(): void {
     const session = navigator.mediaSession;
@@ -422,11 +460,11 @@ export default class AudioSidebarPlugin extends Plugin {
   }
   private handleNativePause(event: Event): void {
     const audio = event.target;
-    if (audio instanceof HTMLAudioElement && this.nativeMirrors.has(audio) && this.player.wantsPlayback) this.player.pause();
+    if (audio instanceof HTMLAudioElement && this.nativeMirrors.has(audio) && !this.isNativeMirrorSyncing(audio) && this.player.wantsPlayback) this.player.pause();
   }
   private handleNativeSeek(event: Event): void {
     const audio = event.target;
-    if (!(audio instanceof HTMLAudioElement) || !this.nativeMirrors.has(audio) || !this.player.file) return;
+    if (!(audio instanceof HTMLAudioElement) || !this.nativeMirrors.has(audio) || this.isNativeMirrorSyncing(audio) || !this.player.file) return;
     if (Math.abs(audio.currentTime - this.player.position) > 0.35) this.player.audio.currentTime = audio.currentTime;
   }
   private async activateView(): Promise<void> {
