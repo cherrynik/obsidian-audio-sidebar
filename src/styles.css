@@ -89,6 +89,7 @@
   border: 0;
   border-radius: 4px;
   background: transparent;
+  cursor: pointer;
 }
 .audio-sb-view .audio-sb-item:hover { background: var(--background-modifier-hover); }
 .audio-sb-view .audio-sb-item-active {
@@ -138,9 +139,12 @@
   background: var(--background-primary);
   box-shadow: 0 -8px 24px color-mix(in srgb, var(--background-primary) 82%, transparent);
 }
-.audio-sb-current-track { display: grid; grid-template-columns: minmax(0, 1fr) 28px; align-items: start; gap: 8px; min-width: 0; margin-bottom: 5px; }
+.audio-sb-current-track { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px; min-width: 0; margin-bottom: 5px; }
 .audio-sb-current-copy { min-width: 0; }
+.audio-sb-current-actions { display: flex; align-items: center; gap: 0; }
+.audio-sb-view button.audio-sb-focus-track,
 .audio-sb-view button.audio-sb-close-player { width: 28px; height: 28px; padding: 6px; color: var(--text-faint); }
+.audio-sb-view button.audio-sb-focus-track:hover,
 .audio-sb-view button.audio-sb-close-player:hover { color: var(--text-normal); }
 .audio-sb-current-title,
 .audio-sb-current-artist {

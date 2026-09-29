@@ -79,7 +79,9 @@ class AudioSidebarView extends ItemView {
       type: 'button'
     });
     this.location.addEventListener('click', () => void this.plugin.revealCurrentFile());
-    this.iconButton(currentTrack, 'x', 'Close player', () => this.plugin.player.stop()).addClass('audio-sb-close-player');
+    const currentActions = currentTrack.createDiv({ cls: 'audio-sb-current-actions' });
+    this.iconButton(currentActions, 'eye', 'Focus current track', () => this.plugin.focusCurrentTrack()).addClass('audio-sb-focus-track');
+    this.iconButton(currentActions, 'x', 'Close player', () => this.plugin.player.stop()).addClass('audio-sb-close-player');
     if (!document.getElementById('cherrynik-plyr-icons')) {
       const icons = document.createElement('div');
       icons.id = 'cherrynik-plyr-icons';
@@ -137,6 +139,18 @@ class AudioSidebarView extends ItemView {
     this.updatePlayer();
   }
 
+  focusTrack(path: string): void {
+    const focusRow = (): void => {
+      const row = [...this.list.querySelectorAll<HTMLElement>('.audio-sb-item')]
+        .find(item => item.dataset.path === path);
+      if (!row) return;
+      row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      row.tabIndex = -1;
+      row.focus({ preventScroll: true });
+    };
+    requestAnimationFrame(focusRow);
+  }
+
   showFolder(folder: TFolder | null): void {
     if (!(folder instanceof TFolder)) return;
     this.folder = folder;
@@ -164,10 +178,11 @@ class AudioSidebarView extends ItemView {
       const row = this.list.createDiv({ cls: 'audio-sb-item' });
       row.dataset.path = file.path;
       row.dataset.name = file.basename.toLowerCase();
-      const button = this.iconButton(row, 'play', `Play ${file.basename}`, () => {
+      const activateTrack = (): void => {
         if (this.plugin.player.file?.path === file.path) this.plugin.player.toggle();
         else this.plugin.player.play(file, files.map(item => item.path), this.folder?.name || 'Audio');
-      });
+      };
+      const button = this.iconButton(row, 'play', `Play ${file.basename}`, activateTrack);
       button.addClass('audio-sb-track-play');
       const label = trackParts(file.basename);
       const copy = row.createDiv({ cls: 'audio-sb-track-copy' });
@@ -178,13 +193,9 @@ class AudioSidebarView extends ItemView {
       probe.preload = 'metadata';
       probe.src = this.app.vault.getResourcePath(file);
       probe.addEventListener('loadedmetadata', () => { duration.textContent = formatTime(probe.duration); }, { once: true });
-      row.addEventListener('dblclick', event => {
+      row.addEventListener('click', event => {
         if ((event.target as Element | null)?.closest('button')) return;
-        if (this.plugin.player.file?.path === file.path) {
-          if (!this.plugin.player.playing) this.plugin.player.resume();
-          return;
-        }
-        this.plugin.player.play(file, files.map(item => item.path), this.folder?.name || 'Audio');
+        activateTrack();
       });
       row.addEventListener('contextmenu', event => {
         this.showTrackMenu(event, file, files.map(entry => entry.path), this.folder?.name || 'Audio');
@@ -324,6 +335,15 @@ export default class AudioSidebarPlugin extends Plugin {
   private mediaSessionOwned = false;
   private nativeMirrors = new Set<HTMLAudioElement>();
   private nativeMirrorSyncUntil = new WeakMap<HTMLAudioElement, number>();
+
+  focusCurrentTrack(): void {
+    const file = this.player.file;
+    if (!file?.parent) return;
+    this.selectFolder(file.parent);
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
+      if (leaf.view instanceof AudioSidebarView) leaf.view.focusTrack(file.path);
+    }
+  }
 
   openSettings(): void {
     const setting = (this.app as App & {
