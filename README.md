@@ -9,6 +9,7 @@ The fork keeps the original audio features and adds:
 - a persistent player that always continues while changing folders and notes.
 - a compact native-player interface with icon-only controls.
 - previous and next controls that keep the active folder queue while browsing.
+- stable folder selection that ignores repeated clicks and disclosure toggles.
 
 ## BRAT installation
 

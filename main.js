@@ -1654,10 +1654,12 @@ class AudioSidebarPlugin extends Plugin {
   }
 
   async loadFolderIntoLeaves(folder) {
+    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE);
+    const alreadyLoaded = leaves.some(leaf => leaf.view instanceof AudioSidebarView && leaf.view._loadedFolder?.path === folder.path);
+    if (this.selectedFolder?.path === folder.path && alreadyLoaded) return;
     this.selectedFolder = folder;
     await this.activateView();
-    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE);
-    for (const leaf of leaves) {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
       if (leaf.view instanceof AudioSidebarView) {
         leaf.view.loadFolder(folder);
       }
@@ -2017,6 +2019,7 @@ class AudioSidebarPlugin extends Plugin {
   hookFileExplorer() {
     this.registerDomEvent(this.app.workspace.containerEl, 'click', (e) => {
       const target = e.target instanceof Element ? e.target : null;
+      if (target?.closest('.collapse-icon')) return;
       const folderTitleEl = target?.closest('.nav-folder-title');
       const nestedRowEl = target?.closest('.nv-row');
       const folderPath = folderTitleEl?.dataset.path ?? nestedRowEl?.dataset.key;
@@ -2024,7 +2027,7 @@ class AudioSidebarPlugin extends Plugin {
       const folder = folderPath === '/'
         ? this.app.vault.getRoot()
         : this.app.vault.getAbstractFileByPath(folderPath);
-      if (folder instanceof TFolder) this.loadFolderIntoLeaves(folder);
+      if (folder instanceof TFolder && this.selectedFolder?.path !== folder.path) this.loadFolderIntoLeaves(folder);
     });
   }
 
