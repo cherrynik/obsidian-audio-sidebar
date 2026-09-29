@@ -212,6 +212,8 @@ describe('theme-safe styles', () => {
     expect(css).toMatch(/\.audio-sb-icon-surface\s*\{[^}]*border-radius:\s*50%/s);
     expect(css).toMatch(/\.audio-sb-icon-btn:focus-visible\s+\.audio-sb-icon-surface/);
     expect(css).toMatch(/\.audio-sb-icon-btn:focus\s+\.audio-sb-icon-surface/);
+    expect(css).toMatch(/\.audio-sb-main-play:focus\s+\.audio-sb-main-play-surface/);
+    expect(css).toMatch(/\.audio-sb-main-play:focus-visible\s+\.audio-sb-main-play-surface\s*\{[^}]*border-color:\s*var\(--text-on-accent\)/s);
   });
 
   it('uses theme-aware colors for range value tooltips', () => {
