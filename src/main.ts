@@ -28,6 +28,7 @@ class AudioSidebarView extends ItemView {
   private footer!: HTMLElement;
   private title!: HTMLElement;
   private artist!: HTMLElement;
+  private location!: HTMLButtonElement;
   private media!: HTMLElement;
   private previous!: HTMLButtonElement;
   private next!: HTMLButtonElement;
@@ -59,6 +60,12 @@ class AudioSidebarView extends ItemView {
     const currentCopy = currentTrack.createDiv({ cls: 'audio-sb-current-copy' });
     this.title = currentCopy.createDiv({ cls: 'audio-sb-current-title' });
     this.artist = currentCopy.createDiv({ cls: 'audio-sb-current-artist' });
+    this.location = currentCopy.createEl('button', {
+      cls: 'audio-sb-current-location',
+      type: 'button',
+      attr: { 'aria-label': 'Show current track in Files', title: 'Show in Files' }
+    });
+    this.location.addEventListener('click', () => void this.plugin.revealCurrentFile());
     this.iconButton(currentTrack, 'x', 'Close player', () => this.plugin.player.stop()).addClass('audio-sb-close-player');
     if (!document.getElementById('cherrynik-plyr-icons')) {
       const icons = document.createElement('div');
@@ -184,6 +191,9 @@ class AudioSidebarView extends ItemView {
     this.title.textContent = label.title;
     this.artist.textContent = label.artist;
     this.artist.toggleClass('audio-sb-hidden', !label.artist);
+    const parentPath = this.plugin.player.file?.parent?.path || '';
+    this.location.textContent = parentPath.split('/').join(' / ');
+    this.location.toggleClass('audio-sb-hidden', !parentPath);
     this.footer.toggleClass('audio-sb-hidden', !hasTrack);
     this.previous.disabled = !hasTrack;
     this.next.disabled = !hasTrack;
@@ -466,6 +476,13 @@ export default class AudioSidebarPlugin extends Plugin {
     const audio = event.target;
     if (!(audio instanceof HTMLAudioElement) || !this.nativeMirrors.has(audio) || this.isNativeMirrorSyncing(audio) || !this.player.file) return;
     if (Math.abs(audio.currentTime - this.player.position) > 0.35) this.player.audio.currentTime = audio.currentTime;
+  }
+  async revealCurrentFile(): Promise<void> {
+    const file = this.player.file;
+    if (!file) return;
+    await this.app.workspace.getLeaf(false).openFile(file);
+    await (this.app as unknown as { commands: { executeCommandById(id: string): Promise<boolean> | boolean } })
+      .commands.executeCommandById('file-explorer:reveal-active-file');
   }
   private async activateView(): Promise<void> {
     const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE);
