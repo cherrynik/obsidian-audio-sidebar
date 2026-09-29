@@ -1,7 +1,7 @@
 {
   "name": "cherrynik-audio-sidebar",
   "private": true,
-  "version": "2.6.6",
+  "version": "2.6.7",
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",

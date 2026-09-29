@@ -276,8 +276,7 @@
 .audio-sb-view button.audio-sb-speed-option:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
 .audio-sb-view button.audio-sb-speed-option.is-active { color: var(--interactive-accent); font-weight: var(--font-semibold); }
 .audio-sb-queue-wrap { position: relative; }
-.audio-sb-queue-wrap:hover::before,
-.audio-sb-queue-wrap:focus-within::before {
+.audio-sb-queue-wrap[data-open='true']::before {
   content: '';
   position: absolute;
   right: 0;
@@ -304,8 +303,6 @@
   transform: translateY(3px);
   transition: opacity 90ms ease, transform 90ms ease, visibility 90ms;
 }
-.audio-sb-queue-wrap:hover .audio-sb-queue-popup,
-.audio-sb-queue-wrap:focus-within .audio-sb-queue-popup { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0); }
 .audio-sb-queue-heading { padding: 7px 8px; color: var(--text-muted); font-size: var(--font-smallest); font-weight: var(--font-medium); }
 .audio-sb-view .audio-sb-queue-item {
   display: grid;

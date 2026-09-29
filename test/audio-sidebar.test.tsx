@@ -140,4 +140,13 @@ describe('AudioSidebarApp', () => {
     expect(controlsWithOpenMenus.playTrack).toHaveBeenCalledWith(tracks[1].path);
     expect(controlsWithOpenMenus.setRate).toHaveBeenCalledWith(1.5);
   });
+
+  it('opens the playback queue only from its trigger', () => {
+    const controls = controller();
+    const { container } = render(<AudioSidebarApp controller={controls} initialSnapshot={snapshot()} />);
+    fireEvent.mouseEnter(container.querySelector('.audio-sb-queue-wrap')!);
+    expect(controls.toggleQueue).not.toHaveBeenCalled();
+    fireEvent.mouseEnter(screen.getByRole('button', { name: 'Playback queue' }));
+    expect(controls.toggleQueue).toHaveBeenCalledWith(true);
+  });
 });

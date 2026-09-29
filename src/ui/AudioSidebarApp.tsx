@@ -193,10 +193,10 @@ export function AudioSidebarApp({ controller, initialSnapshot }: {
             <IconButton label={state.muted ? 'Unmute' : 'Mute'} onClick={controller.toggleMute}>{state.muted ? <VolumeX /> : <Volume2 />}</IconButton>
             <RangeControl label="Volume" value={state.muted ? 0 : state.volume} maximum={1} step={0.01} format={value => `${Math.round(value * 100)}%`} onChange={controller.setVolume} />
           </div>
-          <div className="audio-sb-queue-wrap" onMouseEnter={() => controller.toggleQueue(true)} onMouseLeave={() => controller.toggleQueue(false)}>
+          <div className="audio-sb-queue-wrap" data-open={state.queueOpen} onMouseLeave={() => controller.toggleQueue(false)}>
             <Popover.Root open={state.queueOpen} onOpenChange={controller.toggleQueue}>
-              <Popover.Trigger asChild><IconButton label="Playback queue"><ListMusic /></IconButton></Popover.Trigger>
-              <Popover.Content className="audio-sb-queue-popup" side="top" align="end" sideOffset={4} role="dialog" aria-label="Playback queue">
+              <Popover.Trigger asChild><IconButton label="Playback queue" onMouseEnter={() => controller.toggleQueue(true)}><ListMusic /></IconButton></Popover.Trigger>
+              <Popover.Content className="audio-sb-queue-popup" side="top" align="end" sideOffset={4} role="dialog" aria-label="Playback queue" onMouseEnter={() => controller.toggleQueue(true)}>
               <div className="audio-sb-queue-heading">{state.folderName}</div>
               {state.tracks.map(track => <button key={track.path} type="button" className={`audio-sb-queue-item${track.path === state.currentPath ? ' audio-sb-queue-current' : ''}`} onClick={() => controller.playTrack(track.path)} onContextMenu={event => controller.openTrackMenu(track.path, event.nativeEvent)}>
                 <span className="audio-sb-queue-play">{track.path === state.currentPath && state.playing ? <Pause /> : <Play />}</span>
