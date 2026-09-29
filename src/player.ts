@@ -22,7 +22,7 @@ export class SingleAudioPlayer {
     this.audio.preload = 'metadata';
     this.audio.volume = this.volume;
     this.audio.playbackRate = this.rate;
-    for (const event of ['play', 'pause', 'loadedmetadata', 'volumechange', 'ratechange']) {
+    for (const event of ['play', 'pause', 'timeupdate', 'loadedmetadata', 'durationchange', 'volumechange', 'ratechange']) {
       this.audio.addEventListener(event, () => {
         this.volume = this.audio.volume;
         this.rate = this.audio.playbackRate;

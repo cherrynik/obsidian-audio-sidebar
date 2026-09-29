@@ -58,7 +58,7 @@ test('one persistent audio element changes source and preserves folder queue', (
   assert.equal(audio.src, '');
 });
 
-test('the native media element keeps Plyr volume and speed state', () => {
+test('the native media element keeps volume and speed state', () => {
   const { player, audio } = createPlayer();
   player.play(files[0], [files[0].path], 'Audio');
   player.pause();
