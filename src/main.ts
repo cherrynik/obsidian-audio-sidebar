@@ -1,4 +1,4 @@
-import { ItemView, Menu, Notice, Plugin, TFile, TFolder, setIcon, type TAbstractFile, type WorkspaceLeaf } from 'obsidian';
+import { App, ItemView, Menu, Notice, Plugin, PluginSettingTab, Setting, TFile, TFolder, setIcon, type TAbstractFile, type WorkspaceLeaf } from 'obsidian';
 // @ts-expect-error Plyr's published declaration mixes export= with a default export.
 import Plyr from 'plyr';
 import plyrIcons from '../node_modules/plyr/dist/plyr.svg';
@@ -297,6 +297,7 @@ class AudioSidebarView extends ItemView {
 export default class AudioSidebarPlugin extends Plugin {
   player!: SingleAudioPlayer;
   selectedFolder: TFolder | null = null;
+  followFilesSelection = true;
   private playerSettings = { volume: 1, rate: 1 };
   private mediaSessionOwned = false;
   private nativeMirrors = new Set<HTMLAudioElement>();
@@ -308,9 +309,11 @@ export default class AudioSidebarPlugin extends Plugin {
       volume: Math.max(0, Math.min(1, Number(saved.volume ?? (saved.masterVolume == null ? 1 : saved.masterVolume / 100)))),
       rate: Math.max(0.5, Math.min(2, Number(saved.rate ?? saved.playbackRate ?? 1)))
     };
-    await this.saveData(this.playerSettings);
+    this.followFilesSelection = saved.followFilesSelection !== false;
+    await this.saveSettings();
     this.resetPlayer();
     this.registerView(VIEW_TYPE, leaf => new AudioSidebarView(leaf, this));
+    this.addSettingTab(new AudioSidebarSettingTab(this.app, this));
     this.addRibbonIcon('music', 'Audio Sidebar', () => void this.activateView());
     this.addCommand({ id: 'next-track', name: 'Play next track', callback: () => this.player.playRelative(1) });
     this.addCommand({ id: 'previous-track', name: 'Play previous track', callback: () => this.player.playRelative(-1) });
@@ -325,7 +328,9 @@ export default class AudioSidebarPlugin extends Plugin {
     this.registerDomEvent(this.app.workspace.containerEl, 'seeking', event => this.handleNativeSeek(event), true);
     this.registerDomEvent(this.app.workspace.containerEl, 'click', event => this.followFolderClick(event), true);
     this.registerEvent(this.app.workspace.on('file-open', file => {
-      if (file instanceof TFile && AUDIO_EXTENSIONS.has(file.extension.toLowerCase())) this.attachNativeMirror(file);
+      if (!(file instanceof TFile) || !AUDIO_EXTENSIONS.has(file.extension.toLowerCase())) return;
+      if (this.followFilesSelection && file.parent) this.selectFolder(file.parent);
+      this.attachNativeMirror(file);
     }));
     this.registerEvent(this.app.vault.on('create', file => {
       if (file instanceof TFile && AUDIO_EXTENSIONS.has(file.extension.toLowerCase())) this.refreshFolderViews();
@@ -355,7 +360,10 @@ export default class AudioSidebarPlugin extends Plugin {
   async savePlayerSettings(): Promise<void> {
     this.playerSettings.volume = this.player.volume;
     this.playerSettings.rate = this.player.rate;
-    await this.saveData(this.playerSettings);
+    await this.saveSettings();
+  }
+  async saveSettings(): Promise<void> {
+    await this.saveData({ ...this.playerSettings, followFilesSelection: this.followFilesSelection });
   }
   findAudioInFolder(folder: TFolder): TFile[] {
     const files: TFile[] = [];
@@ -460,6 +468,7 @@ export default class AudioSidebarPlugin extends Plugin {
     }
   }
   private followFolderClick(event: MouseEvent): void {
+    if (!this.followFilesSelection) return;
     const target = event.target instanceof Element ? event.target : null;
     if (target?.closest('.collapse-icon')) return;
     const fileExplorerFolder = target?.closest('.nav-folder-title') as HTMLElement | null;
@@ -467,6 +476,10 @@ export default class AudioSidebarPlugin extends Plugin {
     if (!path || (path !== 'Audio' && !path.startsWith('Audio/'))) return;
     const folder = this.app.vault.getAbstractFileByPath(path);
     if (!(folder instanceof TFolder)) return;
+    this.selectFolder(folder);
+  }
+  private selectFolder(folder: TFolder): void {
+    if (this.selectedFolder?.path === folder.path) return;
     this.selectedFolder = folder;
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
       if (leaf.view instanceof AudioSidebarView && (leaf.view as AudioSidebarView)['folder']?.path !== folder.path) leaf.view.showFolder(folder);
@@ -521,5 +534,22 @@ export default class AudioSidebarPlugin extends Plugin {
   onunload(): void {
     this.player.stop();
     this.app.workspace.detachLeavesOfType(VIEW_TYPE);
+  }
+}
+
+class AudioSidebarSettingTab extends PluginSettingTab {
+  constructor(app: App, private readonly plugin: AudioSidebarPlugin) { super(app, plugin); }
+
+  display(): void {
+    this.containerEl.empty();
+    new Setting(this.containerEl)
+      .setName('Follow Files selection')
+      .setDesc('When you select an audio file or folder in Files, show tracks from that folder. Turn this off to keep the current Audio Sidebar list fixed while you browse.')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.followFilesSelection)
+        .onChange(async value => {
+          this.plugin.followFilesSelection = value;
+          await this.plugin.saveSettings();
+        }));
   }
 }
