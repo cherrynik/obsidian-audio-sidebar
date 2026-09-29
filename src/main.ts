@@ -35,12 +35,9 @@ class AudioSidebarView extends ItemView {
   private queuePopup!: HTMLElement;
   private repeatButton!: HTMLButtonElement;
   private speedButton!: HTMLButtonElement;
+  private speedPopup!: HTMLElement;
   private plyr?: Plyr;
   private saveTimer?: number;
-  private outsideClick = (event: PointerEvent): void => {
-    const target = event.target instanceof Element ? event.target : null;
-    if (!target?.closest('.audio-sb-queue-wrap')) this.queuePopup?.addClass('audio-sb-hidden');
-  };
   private saveSettings = (): void => {
     window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => void this.plugin.savePlayerSettings(), 600);
@@ -59,8 +56,10 @@ class AudioSidebarView extends ItemView {
     this.list = body.createDiv({ cls: 'audio-sb-list' });
     this.footer = root.createDiv({ cls: 'audio-sb-footer' });
     const currentTrack = this.footer.createDiv({ cls: 'audio-sb-current-track' });
-    this.title = currentTrack.createDiv({ cls: 'audio-sb-current-title' });
-    this.artist = currentTrack.createDiv({ cls: 'audio-sb-current-artist' });
+    const currentCopy = currentTrack.createDiv({ cls: 'audio-sb-current-copy' });
+    this.title = currentCopy.createDiv({ cls: 'audio-sb-current-title' });
+    this.artist = currentCopy.createDiv({ cls: 'audio-sb-current-artist' });
+    this.iconButton(currentTrack, 'x', 'Close player', () => this.plugin.player.stop()).addClass('audio-sb-close-player');
     if (!document.getElementById('cherrynik-plyr-icons')) {
       const icons = document.createElement('div');
       icons.id = 'cherrynik-plyr-icons';
@@ -93,22 +92,22 @@ class AudioSidebarView extends ItemView {
       transport.appendChild(plyrPlay);
     }
     this.next = this.iconButton(transport, 'skip-forward', 'Next track', () => this.plugin.player.playRelative(1));
-    this.speedButton = transport.createEl('button', { cls: 'audio-sb-speed', type: 'button' });
-    this.speedButton.addEventListener('click', () => {
-      const rates = [0.75, 1, 1.25, 1.5, 2];
-      const current = rates.indexOf(this.plugin.player.rate);
-      this.plugin.player.audio.playbackRate = rates[(current + 1) % rates.length];
-      this.updateTransport();
-    });
+    const speedWrap = transport.createDiv({ cls: 'audio-sb-speed-wrap' });
+    this.speedButton = speedWrap.createEl('button', { cls: 'audio-sb-speed', type: 'button' });
+    this.speedPopup = speedWrap.createDiv({ cls: 'audio-sb-speed-popup' });
+    for (const rate of [0.75, 1, 1.25, 1.5, 2]) {
+      const option = this.speedPopup.createEl('button', { cls: 'audio-sb-speed-option', type: 'button', text: `${rate}×` });
+      option.addEventListener('click', () => {
+        this.plugin.player.audio.playbackRate = rate;
+        this.updateTransport();
+      });
+    }
     const controls = this.media.querySelector<HTMLElement>('.plyr__controls');
     const queueWrap = controls?.createDiv({ cls: 'audio-sb-queue-wrap' });
     if (queueWrap) {
-      this.queueButton = this.iconButton(queueWrap, 'list-music', 'Playback queue', () => {
-        this.queuePopup.toggleClass('audio-sb-hidden', !this.queuePopup.hasClass('audio-sb-hidden'));
-      });
-      this.queuePopup = queueWrap.createDiv({ cls: 'audio-sb-queue-popup audio-sb-hidden' });
+      this.queueButton = this.iconButton(queueWrap, 'list-music', 'Playback queue', () => undefined);
+      this.queuePopup = queueWrap.createDiv({ cls: 'audio-sb-queue-popup' });
     }
-    document.addEventListener('pointerdown', this.outsideClick);
     this.plugin.player.audio.addEventListener('volumechange', this.saveSettings);
     this.plugin.player.audio.addEventListener('ratechange', this.saveSettings);
     this.showFolder(this.plugin.selectedFolder);
@@ -203,6 +202,9 @@ class AudioSidebarView extends ItemView {
     this.speedButton.textContent = `${this.plugin.player.rate}×`;
     this.speedButton.setAttribute('aria-label', `Playback speed ${this.plugin.player.rate} times`);
     this.speedButton.title = `Playback speed: ${this.plugin.player.rate}×`;
+    this.speedPopup?.querySelectorAll<HTMLElement>('.audio-sb-speed-option').forEach(option => {
+      option.toggleClass('is-active', option.textContent === `${this.plugin.player.rate}×`);
+    });
   }
 
   private iconButton(parent: HTMLElement, icon: string, label: string, action: () => void): HTMLButtonElement {
@@ -224,11 +226,21 @@ class AudioSidebarView extends ItemView {
     for (const path of this.plugin.player.queuePaths) {
       const file = this.app.vault.getAbstractFileByPath(path);
       if (!(file instanceof TFile)) continue;
-      const row = this.queuePopup.createEl('button', { cls: 'audio-sb-queue-item', type: 'button', text: file.basename });
+      const row = this.queuePopup.createEl('button', { cls: 'audio-sb-queue-item', type: 'button' });
+      const icon = row.createSpan({ cls: 'audio-sb-queue-play' });
+      setIcon(icon, path === this.plugin.player.file?.path && this.plugin.player.playing ? 'pause' : 'play');
+      const label = trackParts(file.basename);
+      const copy = row.createSpan({ cls: 'audio-sb-track-copy' });
+      copy.createSpan({ text: label.title, cls: 'audio-sb-track-title' });
+      if (label.artist) copy.createSpan({ text: label.artist, cls: 'audio-sb-track-artist' });
+      const duration = row.createSpan({ cls: 'audio-sb-track-duration' });
+      const probe = document.createElement('audio');
+      probe.preload = 'metadata';
+      probe.src = this.app.vault.getResourcePath(file);
+      probe.addEventListener('loadedmetadata', () => { duration.textContent = formatTime(probe.duration); }, { once: true });
       row.toggleClass('audio-sb-queue-current', path === this.plugin.player.file?.path);
       row.addEventListener('click', () => {
         this.plugin.player.play(file, this.plugin.player.queuePaths, this.plugin.player.queueName);
-        this.queuePopup.addClass('audio-sb-hidden');
       });
     }
     this.queuePopup.scrollTop = scroll;
@@ -236,7 +248,6 @@ class AudioSidebarView extends ItemView {
 
   async onClose(): Promise<void> {
     window.clearTimeout(this.saveTimer);
-    document.removeEventListener('pointerdown', this.outsideClick);
     this.plugin.player.audio.removeEventListener('volumechange', this.saveSettings);
     this.plugin.player.audio.removeEventListener('ratechange', this.saveSettings);
     await this.plugin.savePlayerSettings();
