@@ -34,6 +34,7 @@ class AudioSidebarView extends ItemView {
   private next!: HTMLButtonElement;
   private queueButton!: HTMLButtonElement;
   private queuePopup!: HTMLElement;
+  private muteButton?: HTMLButtonElement;
   private repeatButton!: HTMLButtonElement;
   private speedButton!: HTMLButtonElement;
   private speedPopup!: HTMLElement;
@@ -42,6 +43,13 @@ class AudioSidebarView extends ItemView {
   private saveSettings = (): void => {
     window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => void this.plugin.savePlayerSettings(), 600);
+  };
+  private updateVolumeIcon = (): void => {
+    if (!this.muteButton) return;
+    const muted = this.plugin.player.audio.muted || this.plugin.player.audio.volume === 0;
+    this.muteButton.empty();
+    setIcon(this.muteButton, muted ? 'volume-x' : 'volume-2');
+    this.muteButton.setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
   };
 
   constructor(leaf: WorkspaceLeaf, private readonly plugin: AudioSidebarPlugin) { super(leaf); }
@@ -64,7 +72,7 @@ class AudioSidebarView extends ItemView {
     this.location = currentMeta.createEl('button', {
       cls: 'audio-sb-current-location',
       type: 'button',
-      attr: { 'aria-label': 'Show current track in Files', title: 'Show in Files' }
+      attr: { 'aria-label': 'Show current track in Files' }
     });
     this.location.addEventListener('click', () => void this.plugin.revealCurrentFile());
     this.iconButton(currentTrack, 'x', 'Close player', () => this.plugin.player.stop()).addClass('audio-sb-close-player');
@@ -85,8 +93,10 @@ class AudioSidebarView extends ItemView {
       iconUrl: '',
       invertTime: false,
       keyboard: { focused: true, global: false },
-      tooltips: { controls: true, seek: true }
+      tooltips: { controls: false, seek: false }
     });
+    this.muteButton = this.media.querySelector<HTMLButtonElement>("[data-plyr='mute']") || undefined;
+    this.updateVolumeIcon();
     const transport = this.footer.createDiv({ cls: 'audio-sb-transport' });
     this.footer.insertBefore(transport, this.media);
     this.repeatButton = this.iconButton(transport, 'repeat-2', 'Repeat track', () => {
@@ -117,6 +127,7 @@ class AudioSidebarView extends ItemView {
       this.queuePopup = queueWrap.createDiv({ cls: 'audio-sb-queue-popup' });
     }
     this.plugin.player.audio.addEventListener('volumechange', this.saveSettings);
+    this.plugin.player.audio.addEventListener('volumechange', this.updateVolumeIcon);
     this.plugin.player.audio.addEventListener('ratechange', this.saveSettings);
     this.showFolder(this.plugin.selectedFolder);
     this.updatePlayer();
@@ -237,7 +248,6 @@ class AudioSidebarView extends ItemView {
     this.repeatButton.setAttribute('aria-pressed', String(this.plugin.player.audio.loop));
     this.speedButton.textContent = `${this.plugin.player.rate}×`;
     this.speedButton.setAttribute('aria-label', `Playback speed ${this.plugin.player.rate} times`);
-    this.speedButton.title = `Playback speed: ${this.plugin.player.rate}×`;
     this.speedPopup?.querySelectorAll<HTMLElement>('.audio-sb-speed-option').forEach(option => {
       option.toggleClass('is-active', option.textContent === `${this.plugin.player.rate}×`);
     });
@@ -247,7 +257,7 @@ class AudioSidebarView extends ItemView {
     const button = parent.createEl('button', {
       cls: 'audio-sb-icon-btn',
       type: 'button',
-      attr: { 'aria-label': label, title: label }
+      attr: { 'aria-label': label }
     });
     setIcon(button, icon);
     button.addEventListener('click', action);
@@ -286,6 +296,7 @@ class AudioSidebarView extends ItemView {
   async onClose(): Promise<void> {
     window.clearTimeout(this.saveTimer);
     this.plugin.player.audio.removeEventListener('volumechange', this.saveSettings);
+    this.plugin.player.audio.removeEventListener('volumechange', this.updateVolumeIcon);
     this.plugin.player.audio.removeEventListener('ratechange', this.saveSettings);
     await this.plugin.savePlayerSettings();
     this.plugin.player.stop();
