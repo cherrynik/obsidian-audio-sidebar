@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { AudioSidebarApp, type AudioSidebarController, type AudioSidebarSnapshot } from '../src/ui/AudioSidebarApp';
 import { splitTrackName } from '../src/ui/track-name';
 
@@ -106,6 +107,15 @@ describe('AudioSidebarApp', () => {
     expect(controls.toggleMute).toHaveBeenCalledOnce();
   });
 
+  it('renders every icon control through an isolated circular surface', () => {
+    render(<AudioSidebarApp controller={controller()} initialSnapshot={snapshot()} />);
+    for (const button of screen.getAllByRole('button')) {
+      if (!button.classList.contains('audio-sb-icon-btn')) continue;
+      expect(button.querySelector(':scope > .audio-sb-icon-surface')).not.toBeNull();
+    }
+    expect(screen.getByRole('button', { name: 'Pause' }).querySelector('.audio-sb-main-play-surface')).not.toBeNull();
+  });
+
   it('updates seek and volume through stable sliders', () => {
     const controls = controller();
     render(<AudioSidebarApp controller={controls} initialSnapshot={snapshot()} />);
@@ -171,5 +181,20 @@ describe('AudioSidebarApp', () => {
     expect(controls.toggleQueue).not.toHaveBeenCalled();
     fireEvent.mouseEnter(screen.getByRole('button', { name: 'Playback queue' }));
     expect(controls.toggleQueue).toHaveBeenCalledWith(true);
+  });
+});
+
+describe('theme-safe styles', () => {
+  const css = readFileSync('src/styles.css', 'utf8');
+
+  it('keeps focus geometry on the inner circular surface', () => {
+    expect(css).toMatch(/\.audio-sb-icon-surface\s*\{[^}]*border-radius:\s*50%/s);
+    expect(css).toMatch(/\.audio-sb-icon-btn:focus-visible\s+\.audio-sb-icon-surface/);
+  });
+
+  it('uses theme-aware colors for range value tooltips', () => {
+    const rule = css.match(/\.audio-sb-range-value\s*\{([^}]*)\}/s)?.[1] ?? '';
+    expect(rule).toContain('background: var(--background-secondary)');
+    expect(rule).not.toContain('--background-modifier-message');
   });
 });
