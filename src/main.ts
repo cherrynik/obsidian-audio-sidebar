@@ -83,7 +83,7 @@ class AudioSidebarView extends ItemView {
     });
     this.location.addEventListener('click', () => void this.plugin.revealCurrentFile());
     const currentActions = currentTrack.createDiv({ cls: 'audio-sb-current-actions' });
-    this.iconButton(currentActions, 'eye', 'Focus current track', () => void this.plugin.focusCurrentTrack()).addClass('audio-sb-focus-track');
+    this.iconButton(currentActions, 'eye', 'Focus current track', () => void this.plugin.focusCurrentTrack(), true).addClass('audio-sb-focus-track');
     this.iconButton(currentActions, 'x', 'Close player', () => this.plugin.player.stop()).addClass('audio-sb-close-player');
     if (!document.getElementById('cherrynik-plyr-icons')) {
       const icons = document.createElement('div');
@@ -270,13 +270,25 @@ class AudioSidebarView extends ItemView {
     });
   }
 
-  private iconButton(parent: HTMLElement, icon: string, label: string, action: () => void): HTMLButtonElement {
+  private iconButton(parent: HTMLElement, icon: string, label: string, action: () => void, runOnPointerDown = false): HTMLButtonElement {
     const button = parent.createEl('button', {
       cls: 'audio-sb-icon-btn',
       type: 'button'
     });
     this.setButtonIcon(button, icon, label);
-    button.addEventListener('click', action);
+    if (runOnPointerDown) {
+      button.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        action();
+      });
+      button.addEventListener('click', (event) => {
+        if (event.detail === 0) action();
+      });
+    } else {
+      button.addEventListener('click', action);
+    }
     return button;
   }
 
