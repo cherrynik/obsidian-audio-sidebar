@@ -577,6 +577,22 @@ class AudioSidebarView extends ItemView {
     return audio;
   }
 
+  async playExternalFile(file, startTime = 0) {
+    let audio = this.getTrackAudios().find(candidate => candidate.dataset.trackPath === file.path);
+    if (!audio) audio = this.createDetachedTrack(file.path);
+    if (!audio) throw new Error(`Could not create a player for ${file.path}`);
+
+    const seek = () => {
+      const duration = Number.isFinite(audio.duration) ? audio.duration : null;
+      const targetTime = duration == null ? startTime : Math.min(startTime, Math.max(0, duration - 0.05));
+      if (Number.isFinite(targetTime) && targetTime > 0) audio.currentTime = targetTime;
+    };
+    if (audio.readyState >= 1) seek();
+    else audio.addEventListener('loadedmetadata', seek, { once: true });
+
+    await this.fadeInTrack(audio);
+  }
+
   playRelativeTrack(fromAudio, offset) {
     const currentPath = fromAudio?.dataset.trackPath;
     let queue = this._playQueuePaths?.length ? this._playQueuePaths : this.getVisibleQueue();
@@ -1457,6 +1473,51 @@ class AudioSidebarPlugin extends Plugin {
     return files.sort((a, b) => a.basename.localeCompare(b.basename));
   }
 
+  normalizeResourceUrl(source) {
+    if (!source) return '';
+    try {
+      const url = new URL(source, window.location.href);
+      url.hash = '';
+      url.search = '';
+      return decodeURIComponent(url.href);
+    } catch (_) {
+      return source;
+    }
+  }
+
+  resolveNativeAudioFile(audio) {
+    const source = this.normalizeResourceUrl(audio.currentSrc || audio.src || audio.getAttribute('src'));
+    if (!source) return null;
+    return this.app.vault.getFiles().find(file =>
+      AUDIO_EXTENSIONS.includes(file.extension.toLowerCase()) &&
+      this.normalizeResourceUrl(this.app.vault.getResourcePath(file)) === source
+    ) || null;
+  }
+
+  async playFileInSidebar(file, startTime = 0) {
+    await this.activateView();
+    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE);
+    const view = leaves.map(leaf => leaf.view).find(candidate => candidate instanceof AudioSidebarView);
+    if (!view) throw new Error('Audio Sidebar is unavailable');
+    await view.playExternalFile(file, startTime);
+  }
+
+  handleNativeAudioPlay(event) {
+    const audio = event.target;
+    if (!(audio instanceof HTMLAudioElement)) return;
+    if (audio.dataset.trackPath || audio.closest('.audio-sb-view')) return;
+    const file = this.resolveNativeAudioFile(audio);
+    if (!file) return;
+
+    const startTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+    audio.pause();
+    this.playFileInSidebar(file, startTime).catch(error => {
+      audio.currentTime = startTime;
+      audio.play().catch(() => {});
+      new Notice(`Could not move ${file.basename} to Now Playing: ${error?.message || error}`);
+    });
+  }
+
   openSfxPicker() {
     const folder = this.getSfxFolder();
     if (!folder) {
@@ -1723,6 +1784,7 @@ class AudioSidebarPlugin extends Plugin {
     this._activeSfx = new Set();
     this._activeLoops = new Map();
     this.registerView(VIEW_TYPE, (leaf) => new AudioSidebarView(leaf, this));
+    this.registerDomEvent(this.app.workspace.containerEl, 'play', event => this.handleNativeAudioPlay(event), true);
     this.addSettingTab(new AudioSidebarSettingTab(this.app, this));
     this.addRibbonIcon('music', 'Audio Sidebar', () => this.activateView());
     this.app.workspace.onLayoutReady(() => {
