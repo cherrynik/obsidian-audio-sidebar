@@ -287,7 +287,11 @@ export default class AudioSidebarPlugin extends Plugin {
     this.registerDomEvent(this.app.workspace.containerEl, 'pointerdown', event => this.rememberNativeMirrorIntent(event), true);
     this.registerDomEvent(window, 'focus', () => this.resynchronizeNativeMirrors());
     this.registerDomEvent(document, 'visibilitychange', () => this.resynchronizeNativeMirrors());
-    this.registerDomEvent(this.app.workspace.containerEl, 'click', event => this.followFolderClick(event), true);
+    this.registerDomEvent(this.app.workspace.containerEl, 'click', event => {
+      this.followFolderClick(event);
+      if (event.detail === 2) this.playAudioFileFromExplorer(event);
+    }, true);
+    this.registerDomEvent(this.app.workspace.containerEl, 'dblclick', event => this.playAudioFileFromExplorer(event), true);
     this.registerEvent(this.app.workspace.on('file-open', file => {
       if (!(file instanceof TFile) || !AUDIO_EXTENSIONS.has(file.extension.toLowerCase())) return;
       if (this.followFilesSelection && file.parent) this.selectFolder(file.parent);
@@ -463,6 +467,24 @@ export default class AudioSidebarPlugin extends Plugin {
     const folder = this.app.vault.getAbstractFileByPath(path);
     if (!(folder instanceof TFolder)) return;
     this.selectFolder(folder);
+  }
+  private playAudioFileFromExplorer(event: MouseEvent): void {
+    const target = event.target instanceof Element ? event.target : null;
+    const standardEntry = target?.closest<HTMLElement>('.nav-file');
+    const standardRow = target?.closest<HTMLElement>('.nav-file-title')
+      ?? standardEntry?.querySelector<HTMLElement>('.nav-file-title');
+    const nestedRow = target?.closest<HTMLElement>('.nv-row');
+    const path = standardRow?.dataset.path ?? standardEntry?.dataset.path ?? nestedRow?.dataset.key;
+    if (!path) return;
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile) || !AUDIO_EXTENSIONS.has(file.extension.toLowerCase())) return;
+    event.preventDefault();
+    if (this.player.file?.path === file.path) {
+      if (!this.player.playing) this.player.resume();
+      return;
+    }
+    const queue = file.parent ? this.findAudioInFolder(file.parent).map(track => track.path) : [file.path];
+    this.player.play(file, queue, file.parent?.name || 'Audio');
   }
   private selectFolder(folder: TFolder): void {
     if (this.selectedFolder?.path === folder.path) return;
