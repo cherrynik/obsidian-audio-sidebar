@@ -251,6 +251,7 @@
 .audio-sb-media .plyr__progress__container { grid-column: 2; grid-row: 1; min-width: 48px; }
 .audio-sb-media .plyr__time--current { grid-column: 1; grid-row: 1; }
 .audio-sb-media .plyr__time--duration { grid-column: 3; grid-row: 1; }
+.audio-sb-media .plyr__time--duration::before { content: '' !important; margin: 0 !important; }
 .audio-sb-media .plyr__volume { grid-column: 4; grid-row: 1; }
 .audio-sb-media .audio-sb-queue-wrap { grid-column: 5; grid-row: 1; }
 .audio-sb-media .plyr__time { width: 38px; min-width: 38px; padding: 0; color: var(--text-muted); font-size: var(--font-smallest); font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -266,7 +267,7 @@
   height: 12px !important;
   min-width: 12px !important;
   min-height: 12px !important;
-  margin-top: -4px !important;
+  margin-top: 0 !important;
   border-radius: 50% !important;
   aspect-ratio: 1;
 }
