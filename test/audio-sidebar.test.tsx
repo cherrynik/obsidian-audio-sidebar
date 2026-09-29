@@ -66,6 +66,8 @@ describe('AudioSidebarApp', () => {
     expect(screen.getAllByText('2pac')).not.toHaveLength(0);
     expect(screen.getAllByText('02:52')).not.toHaveLength(0);
     expect(screen.getByTestId('now-playing')).toHaveTextContent('Audio › Tracks');
+    const activeTrackTitle = screen.getAllByText('Open Fire').find(element => element.closest('.audio-sb-item'));
+    expect(activeTrackTitle?.closest('.audio-sb-item')).toHaveClass('audio-sb-item-active');
   });
 
   it('filters tracks without rebuilding playback', async () => {
