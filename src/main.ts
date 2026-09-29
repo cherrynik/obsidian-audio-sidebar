@@ -158,6 +158,7 @@ class AudioSidebarView extends ItemView {
     const search = body.createEl('input', { cls: 'audio-sb-search', type: 'search', attr: { placeholder: 'Search tracks…', 'aria-label': 'Search tracks' } });
     search.value = this.search;
     search.addEventListener('input', () => { this.search = search.value; this.filterRows(); });
+    body.createDiv({ cls: 'audio-sb-list-fade' });
     this.list = body.createDiv({ cls: 'audio-sb-list' });
     for (const file of files) {
       const row = this.list.createDiv({ cls: 'audio-sb-item' });

@@ -53,11 +53,20 @@
   font-size: var(--font-small);
 }
 .audio-sb-search:focus { border-color: var(--interactive-accent); box-shadow: 0 0 0 1px var(--interactive-accent); }
+.audio-sb-list-fade {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 14px;
+  height: 14px;
+  margin: -7px -2px -14px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, var(--background-primary) 12%, transparent 100%);
+}
 .audio-sb-list {
   flex: 1 1 auto;
   min-height: 0;
   margin: 0 -2px;
-  padding: 0 2px 8px;
+  padding: 7px 2px 8px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
