@@ -1,15 +1,15 @@
 {
   "name": "cherrynik-audio-sidebar",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.1.0",
   "scripts": {
     "build": "node scripts/build.mjs",
     "check": "npm run build && node --check main.js && node --test test/*.test.cjs && git diff --check"
   },
-  "dependencies": {
-    "howler": "^2.2.4"
-  },
   "devDependencies": {
     "esbuild": "^0.25.0"
+  },
+  "dependencies": {
+    "plyr": "^3.8.4"
   }
 }

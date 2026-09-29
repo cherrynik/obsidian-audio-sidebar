@@ -3,37 +3,31 @@ const { readFileSync } = require('node:fs');
 const { test } = require('node:test');
 const vm = require('node:vm');
 
-class FakeHowl {
-  static instances = [];
-  constructor(options) {
-    this.options = options;
-    this.isPlaying = false;
-    this.position = 0;
-    this.length = 180;
-    this.unloaded = false;
-    this.level = options.volume;
-    this.speed = options.rate;
-    FakeHowl.instances.push(this);
+class FakeAudio {
+  constructor() {
+    this.listeners = new Map();
+    this.paused = true;
+    this.currentTime = 0;
+    this.duration = 180;
+    this.volume = 1;
+    this.playbackRate = 1;
+    this.attributes = {};
+    this.src = '';
   }
-  playing() { return this.isPlaying; }
-  play() { this.isPlaying = true; this.options.onplay?.(); }
-  pause() { this.isPlaying = false; this.options.onpause?.(); }
-  stop() { this.isPlaying = false; this.position = 0; }
-  unload() { this.unloaded = true; }
-  seek(value) { if (value !== undefined) this.position = value; return this.position; }
-  duration() { return this.length; }
-  volume(value) { if (value !== undefined) this.level = value; return this.level; }
-  rate(value) { if (value !== undefined) this.speed = value; return this.speed; }
+  addEventListener(name, listener) {
+    const entries = this.listeners.get(name) || [];
+    entries.push(listener);
+    this.listeners.set(name, entries);
+  }
+  dispatch(name) { for (const listener of this.listeners.get(name) || []) listener(); }
+  play() { this.paused = false; this.dispatch('play'); return Promise.resolve(); }
+  pause() { this.paused = true; this.dispatch('pause'); }
+  load() { this.currentTime = 0; }
+  removeAttribute(name) { this[name] = ''; }
 }
 
 const loaded = { exports: {} };
-vm.runInNewContext(readFileSync('src/player.js', 'utf8'), {
-  module: loaded,
-  require: name => {
-    assert.equal(name, 'howler');
-    return { Howl: FakeHowl };
-  }
-});
+vm.runInNewContext(readFileSync('src/player.js', 'utf8'), { module: loaded });
 const { SingleAudioPlayer } = loaded.exports;
 const files = ['Audio/one.mp3', 'Audio/two.mp3'].map(path => ({
   path, basename: path.split('/').pop(), extension: 'mp3', parent: { name: 'Audio' }
@@ -42,25 +36,28 @@ const app = { vault: {
   getResourcePath: file => `app://local/${file.path}`,
   getAbstractFileByPath: path => files.find(file => file.path === path)
 } };
+const createPlayer = () => {
+  const audio = new FakeAudio();
+  return { player: new SingleAudioPlayer(app, () => {}, () => {}, { volume: 0.8, rate: 1.25 }, () => audio), audio };
+};
 
-test('starting another track releases the previous one and keeps its folder queue', () => {
-  FakeHowl.instances.length = 0;
-  const player = new SingleAudioPlayer(app, () => {}, () => {}, { volume: 0.8, rate: 1.25 });
+test('one persistent audio element changes source and preserves folder queue', () => {
+  const { player, audio } = createPlayer();
   player.play(files[0], files.map(file => file.path), 'Audio');
-  const first = FakeHowl.instances[0];
-  assert.equal(first.options.html5, true);
-  assert.equal(first.options.preload, 'metadata');
+  const firstSource = audio.src;
   player.playRelative(1);
-  assert.equal(first.unloaded, true);
+  assert.notEqual(audio.src, firstSource);
+  assert.equal(audio.src, 'app://local/Audio/two.mp3');
+  assert.equal(player.audio, audio);
   assert.equal(player.file.path, files[1].path);
   assert.deepEqual(Array.from(player.queuePaths), files.map(file => file.path));
-  assert.equal(FakeHowl.instances.filter(sound => sound.isPlaying).length, 1);
   player.stop();
-  assert.equal(FakeHowl.instances.filter(sound => sound.isPlaying).length, 0);
+  assert.equal(audio.paused, true);
+  assert.equal(audio.src, '');
 });
 
-test('the one active track supports pause, resume, seek, volume and speed', () => {
-  const player = new SingleAudioPlayer(app, () => {}, () => {}, { volume: 1, rate: 1 });
+test('the player supports pause, resume, seek, volume and speed', () => {
+  const { player, audio } = createPlayer();
   player.play(files[0], [files[0].path], 'Audio');
   player.pause();
   assert.equal(player.playing, false);
@@ -70,18 +67,18 @@ test('the one active track supports pause, resume, seek, volume and speed', () =
   assert.equal(player.position, 90);
   player.setVolume(0.35);
   player.setRate(1.5);
-  assert.equal(player.sound.level, 0.35);
-  assert.equal(player.sound.speed, 1.5);
-  player.stop();
+  assert.equal(audio.volume, 0.35);
+  assert.equal(audio.playbackRate, 1.5);
 });
 
-test('finishing a track advances without leaving its old sound loaded', () => {
-  const player = new SingleAudioPlayer(app, () => {}, () => {}, { volume: 1, rate: 1 });
+test('end advances in the original queue or repeats the active track', () => {
+  const { player, audio } = createPlayer();
   player.play(files[0], files.map(file => file.path), 'Audio');
-  const first = player.sound;
-  first.options.onend();
+  audio.dispatch('ended');
   assert.equal(player.file.path, files[1].path);
-  assert.equal(first.unloaded, true);
-  assert.equal(FakeHowl.instances.filter(sound => sound.isPlaying).length, 1);
-  player.stop();
+  player.setRepeatOne(true);
+  audio.currentTime = 180;
+  audio.dispatch('ended');
+  assert.equal(player.file.path, files[1].path);
+  assert.equal(audio.currentTime, 0);
 });

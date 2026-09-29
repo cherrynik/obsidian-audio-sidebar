@@ -1,5 +1,7 @@
 const { Plugin, ItemView, TFolder, TFile, Notice, setIcon } = require('obsidian');
 const { SingleAudioPlayer } = require('./player');
+import Plyr from 'plyr';
+const plyrIcons = require('../node_modules/plyr/dist/plyr.svg');
 
 const VIEW_TYPE = 'cherrynik-audio-sidebar';
 const AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'ogg', 'flac', 'm4a', 'webm', 'aac']);
@@ -28,47 +30,44 @@ class AudioSidebarView extends ItemView {
     this.footer = root.createEl('div', { cls: 'audio-sb-footer' });
     this.footer.createEl('div', { text: 'Now playing', cls: 'audio-sb-footer-label' });
     this.title = this.footer.createEl('div', { cls: 'audio-sb-current-title' });
-    const controls = this.footer.createEl('div', { cls: 'audio-sb-controls' });
-    this.previous = this.iconButton(controls, 'skip-back', 'Previous track', () => this.plugin.player.playRelative(-1));
-    this.toggle = this.iconButton(controls, 'play', 'Play or pause', () => this.plugin.player.toggle());
-    this.next = this.iconButton(controls, 'skip-forward', 'Next track', () => this.plugin.player.playRelative(1));
-    this.stop = this.iconButton(controls, 'square', 'Stop', () => this.plugin.player.stop());
-    const timeline = this.footer.createEl('div', { cls: 'audio-sb-timeline' });
-    this.elapsed = timeline.createEl('span', { cls: 'audio-sb-timeline-time' });
-    this.seek = timeline.createEl('input', {
-      cls: 'audio-sb-timeline-slider', type: 'range',
-      attr: { min: '0', max: '100', step: '0.1', 'aria-label': 'Seek current track' }
+    if (!document.getElementById('cherrynik-plyr-icons')) {
+      const icons = document.createElement('div');
+      icons.id = 'cherrynik-plyr-icons';
+      icons.hidden = true;
+      icons.innerHTML = plyrIcons;
+      document.body.prepend(icons);
+    }
+    this.media = this.footer.createEl('div', { cls: 'audio-sb-media' });
+    this.media.appendChild(this.plugin.player.audio);
+    this.plyr = new Plyr(this.plugin.player.audio, {
+      controls: ['play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'settings'],
+      settings: ['speed'],
+      speed: { selected: this.plugin.player.rate, options: [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] },
+      volume: this.plugin.player.volume,
+      loadSprite: false,
+      iconUrl: '',
+      invertTime: false,
+      keyboard: { focused: true, global: false },
+      tooltips: { controls: true, seek: true }
     });
-    this.seek.addEventListener('pointerdown', () => { this.seeking = true; });
-    const finishSeeking = () => { this.seeking = false; this.updatePlayer(); };
-    this.seek.addEventListener('pointerup', finishSeeking);
-    this.seek.addEventListener('pointercancel', finishSeeking);
-    this.seek.addEventListener('blur', finishSeeking);
-    this.seek.addEventListener('input', () => {
-      this.plugin.player.seek(this.seek.value);
-      this.elapsed.textContent = formatTime(this.seek.value);
+    this.plugin.player.audio.addEventListener('volumechange', this.saveSettings = () => {
+      window.clearTimeout(this.saveTimer);
+      this.saveTimer = window.setTimeout(() => this.plugin.savePlayerSettings(), 600);
     });
-    this.duration = timeline.createEl('span', { cls: 'audio-sb-timeline-time' });
-
-    const actions = this.footer.createEl('div', { cls: 'audio-sb-player-settings' });
+    this.plugin.player.audio.addEventListener('ratechange', this.saveSettings);
+    const actions = this.footer.createEl('div', { cls: 'audio-sb-player-actions' });
+    this.previous = this.iconButton(actions, 'skip-back', 'Previous track', () => this.plugin.player.playRelative(-1));
+    this.next = this.iconButton(actions, 'skip-forward', 'Next track', () => this.plugin.player.playRelative(1));
+    this.stop = this.iconButton(actions, 'square', 'Stop', () => this.plugin.player.stop());
     this.repeat = this.iconButton(actions, 'repeat-2', 'Repeat current track', () => {
       this.plugin.player.setRepeatOne(!this.plugin.player.repeatOne);
     });
     this.queuePopover = this.createPopover(actions, 'list-music', 'Playback queue');
     this.queuePopover.popup.addClass('audio-sb-queue-popup');
-    this.volumePopover = this.createPopover(actions, 'volume-2', 'Volume');
-    this.volumeSlider = this.createSlider(this.volumePopover.popup, 'Volume', 0, 100, 1,
-      Math.round(this.plugin.player.volume * 100), value => this.plugin.player.setVolume(value / 100));
-    this.volumeSlider.addEventListener('change', () => this.plugin.savePlayerSettings());
-    this.ratePopover = this.createPopover(actions, 'gauge', 'Playback speed');
-    this.rateSlider = this.createSlider(this.ratePopover.popup, 'Speed', 0.5, 2, 0.05,
-      this.plugin.player.rate, value => this.plugin.player.setRate(value));
-    this.rateSlider.addEventListener('change', () => this.plugin.savePlayerSettings());
     this.outsideClick = event => {
       if (!event.target.closest('.audio-sb-control-wrap')) this.closePopovers();
     };
     document.addEventListener('pointerdown', this.outsideClick);
-    this.timer = window.setInterval(() => this.updateProgress(), 500);
     this.showFolder(this.plugin.selectedFolder);
     this.updatePlayer();
   }
@@ -105,24 +104,6 @@ class AudioSidebarView extends ItemView {
 
   closePopovers() {
     this.footer.querySelectorAll('.audio-sb-control-popup').forEach(popup => popup.classList.add('audio-sb-hidden'));
-  }
-
-  createSlider(parent, label, min, max, step, initial, onInput) {
-    parent.createEl('span', { text: label, cls: 'audio-sb-control-label' });
-    const slider = parent.createEl('input', {
-      cls: 'audio-sb-vertical-slider', type: 'range',
-      attr: { min: String(min), max: String(max), step: String(step), 'aria-label': label }
-    });
-    slider.value = String(initial);
-    const value = parent.createEl('span', { cls: 'audio-sb-control-value' });
-    const update = () => {
-      const number = Number(slider.value);
-      value.textContent = label === 'Volume' ? `${Math.round(number)}%` : `${number.toFixed(2).replace(/0$/, '').replace(/\.0$/, '')}×`;
-      slider.style.setProperty('--audio-sb-slider-progress', `${((number - min) / (max - min)) * 100}%`);
-    };
-    slider.addEventListener('input', () => { update(); onInput(Number(slider.value)); });
-    update();
-    return slider;
   }
 
   showFolder(folder) {
@@ -194,28 +175,15 @@ class AudioSidebarView extends ItemView {
     const player = this.plugin.player;
     const hasTrack = !!player.file;
     this.title.textContent = player.file?.basename || 'Nothing playing';
-    for (const button of [this.previous, this.toggle, this.next, this.stop]) button.disabled = !hasTrack;
-    this.toggle.empty();
-    setIcon(this.toggle, player.playing ? 'pause' : 'play');
-    this.toggle.setAttribute('aria-label', player.playing ? 'Pause' : 'Play');
+    this.media.toggleClass('audio-sb-hidden', !hasTrack);
+    for (const button of [this.previous, this.next, this.stop]) button.disabled = !hasTrack;
     this.repeat.empty();
     setIcon(this.repeat, player.repeatOne ? 'repeat-1' : 'repeat-2');
     this.repeat.setAttribute('aria-pressed', String(player.repeatOne));
     this.repeat.title = player.repeatOne ? 'Repeat current track: on' : 'Repeat current track: off';
     this.queuePopover.button.disabled = !player.queuePaths.length;
     this.updateQueue();
-    this.updateProgress();
     this.updateTrackList();
-  }
-
-  updateProgress() {
-    const player = this.plugin.player;
-    const duration = player.duration;
-    this.seek.disabled = !player.file || duration <= 0;
-    this.seek.max = String(duration || 100);
-    if (!this.seeking) this.seek.value = String(player.position);
-    this.elapsed.textContent = formatTime(player.position);
-    this.duration.textContent = formatTime(duration);
   }
 
   updateQueue() {
@@ -239,8 +207,14 @@ class AudioSidebarView extends ItemView {
   }
 
   async onClose() {
-    window.clearInterval(this.timer);
     document.removeEventListener('pointerdown', this.outsideClick);
+    window.clearTimeout(this.saveTimer);
+    this.plugin.player.audio.removeEventListener('volumechange', this.saveSettings);
+    this.plugin.player.audio.removeEventListener('ratechange', this.saveSettings);
+    await this.plugin.savePlayerSettings();
+    this.plugin.player.stop();
+    this.plyr?.destroy();
+    this.plugin.player.resetAudio();
   }
 }
 
