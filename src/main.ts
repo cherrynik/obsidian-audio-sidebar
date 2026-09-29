@@ -1,4 +1,4 @@
-import { ItemView, Notice, Plugin, TFile, TFolder, type WorkspaceLeaf } from 'obsidian';
+import { ItemView, Notice, Plugin, TFile, TFolder, setIcon, type WorkspaceLeaf } from 'obsidian';
 // @ts-expect-error Plyr's published declaration mixes export= with a default export.
 import Plyr from 'plyr';
 import plyrIcons from '../node_modules/plyr/dist/plyr.svg';
@@ -6,6 +6,10 @@ import { SingleAudioPlayer } from './player';
 
 const VIEW_TYPE = 'cherrynik-audio-sidebar';
 const AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'ogg', 'flac', 'm4a', 'webm', 'aac']);
+const formatTime = (seconds: number): string => {
+  const total = Math.max(0, Math.floor(Number(seconds) || 0));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+};
 
 class AudioSidebarView extends ItemView {
   private folder: TFolder | null = null;
@@ -14,8 +18,16 @@ class AudioSidebarView extends ItemView {
   private footer!: HTMLElement;
   private title!: HTMLElement;
   private media!: HTMLElement;
+  private previous!: HTMLButtonElement;
+  private next!: HTMLButtonElement;
+  private queueButton!: HTMLButtonElement;
+  private queuePopup!: HTMLElement;
   private plyr?: Plyr;
   private saveTimer?: number;
+  private outsideClick = (event: PointerEvent): void => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target?.closest('.audio-sb-queue-wrap')) this.queuePopup?.addClass('audio-sb-hidden');
+  };
   private saveSettings = (): void => {
     window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => void this.plugin.savePlayerSettings(), 600);
@@ -54,6 +66,24 @@ class AudioSidebarView extends ItemView {
       keyboard: { focused: true, global: false },
       tooltips: { controls: true, seek: true }
     });
+    const transport = this.footer.createDiv({ cls: 'audio-sb-transport' });
+    this.footer.insertBefore(transport, this.media);
+    this.previous = this.iconButton(transport, 'skip-back', 'Previous track', () => this.plugin.player.playRelative(-1));
+    const plyrPlay = this.media.querySelector<HTMLButtonElement>("[data-plyr='play']");
+    if (plyrPlay) {
+      plyrPlay.addClass('audio-sb-main-play');
+      transport.appendChild(plyrPlay);
+    }
+    this.next = this.iconButton(transport, 'skip-forward', 'Next track', () => this.plugin.player.playRelative(1));
+    const controls = this.media.querySelector<HTMLElement>('.plyr__controls');
+    const queueWrap = controls?.createDiv({ cls: 'audio-sb-queue-wrap' });
+    if (queueWrap) {
+      this.queueButton = this.iconButton(queueWrap, 'list-music', 'Playback queue', () => {
+        this.queuePopup.toggleClass('audio-sb-hidden', !this.queuePopup.hasClass('audio-sb-hidden'));
+      });
+      this.queuePopup = queueWrap.createDiv({ cls: 'audio-sb-queue-popup audio-sb-hidden' });
+    }
+    document.addEventListener('pointerdown', this.outsideClick);
     this.plugin.player.audio.addEventListener('volumechange', this.saveSettings);
     this.plugin.player.audio.addEventListener('ratechange', this.saveSettings);
     this.showFolder(this.plugin.selectedFolder);
@@ -79,14 +109,20 @@ class AudioSidebarView extends ItemView {
     search.addEventListener('input', () => { this.search = search.value; this.filterRows(); });
     this.list = body.createDiv({ cls: 'audio-sb-list' });
     for (const file of files) {
-      const button = this.list.createEl('button', { cls: 'audio-sb-item', type: 'button', text: file.basename });
-      button.dataset.path = file.path;
-      button.dataset.name = file.basename.toLowerCase();
-      button.setAttribute('aria-label', `Play ${file.basename}`);
-      button.onclick = () => {
+      const row = this.list.createDiv({ cls: 'audio-sb-item' });
+      row.dataset.path = file.path;
+      row.dataset.name = file.basename.toLowerCase();
+      const button = this.iconButton(row, 'play', `Play ${file.basename}`, () => {
         if (this.plugin.player.file?.path === file.path) this.plugin.player.toggle();
         else this.plugin.player.play(file, files.map(item => item.path), this.folder?.name || 'Audio');
-      };
+      });
+      button.addClass('audio-sb-track-play');
+      row.createSpan({ text: file.basename, cls: 'audio-sb-track-name' });
+      const duration = row.createSpan({ cls: 'audio-sb-track-duration' });
+      const probe = document.createElement('audio');
+      probe.preload = 'metadata';
+      probe.src = this.app.vault.getResourcePath(file);
+      probe.addEventListener('loadedmetadata', () => { duration.textContent = formatTime(probe.duration); }, { once: true });
     }
     this.filterRows();
     this.updateTrackList();
@@ -94,17 +130,22 @@ class AudioSidebarView extends ItemView {
 
   private filterRows(): void {
     const query = this.search.trim().toLowerCase();
-    this.list.querySelectorAll<HTMLButtonElement>('.audio-sb-item').forEach(row => {
+    this.list.querySelectorAll<HTMLElement>('.audio-sb-item').forEach(row => {
       row.toggleClass('audio-sb-hidden', !!query && !row.dataset.name?.includes(query));
     });
   }
 
   private updateTrackList(): void {
-    this.list.querySelectorAll<HTMLButtonElement>('.audio-sb-item').forEach(row => {
+    this.list.querySelectorAll<HTMLElement>('.audio-sb-item').forEach(row => {
       const active = row.dataset.path === this.plugin.player.file?.path;
       row.toggleClass('audio-sb-item-active', active);
       row.setAttribute('aria-current', active ? 'true' : 'false');
-      row.setAttribute('aria-label', `${active && this.plugin.player.playing ? 'Pause' : 'Play'} ${row.textContent}`);
+      const button = row.querySelector<HTMLButtonElement>('.audio-sb-track-play');
+      if (!button) return;
+      const playing = active && this.plugin.player.playing;
+      button.empty();
+      setIcon(button, playing ? 'pause' : 'play');
+      button.setAttribute('aria-label', `${playing ? 'Pause' : 'Play'} ${row.querySelector('.audio-sb-track-name')?.textContent || ''}`);
     });
   }
 
@@ -112,11 +153,45 @@ class AudioSidebarView extends ItemView {
     const hasTrack = !!this.plugin.player.file;
     this.title.textContent = this.plugin.player.file?.basename || '';
     this.footer.toggleClass('audio-sb-hidden', !hasTrack);
+    this.previous.disabled = !hasTrack;
+    this.next.disabled = !hasTrack;
+    if (this.queueButton) this.queueButton.disabled = !this.plugin.player.queuePaths.length;
+    this.updateQueue();
     this.updateTrackList();
+  }
+
+  private iconButton(parent: HTMLElement, icon: string, label: string, action: () => void): HTMLButtonElement {
+    const button = parent.createEl('button', {
+      cls: 'audio-sb-icon-btn',
+      type: 'button',
+      attr: { 'aria-label': label, title: label }
+    });
+    setIcon(button, icon);
+    button.addEventListener('click', action);
+    return button;
+  }
+
+  private updateQueue(): void {
+    if (!this.queuePopup) return;
+    const scroll = this.queuePopup.scrollTop;
+    this.queuePopup.empty();
+    this.queuePopup.createDiv({ text: this.plugin.player.queueName || 'Queue', cls: 'audio-sb-queue-heading' });
+    for (const path of this.plugin.player.queuePaths) {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (!(file instanceof TFile)) continue;
+      const row = this.queuePopup.createEl('button', { cls: 'audio-sb-queue-item', type: 'button', text: file.basename });
+      row.toggleClass('audio-sb-queue-current', path === this.plugin.player.file?.path);
+      row.addEventListener('click', () => {
+        this.plugin.player.play(file, this.plugin.player.queuePaths, this.plugin.player.queueName);
+        this.queuePopup.addClass('audio-sb-hidden');
+      });
+    }
+    this.queuePopup.scrollTop = scroll;
   }
 
   async onClose(): Promise<void> {
     window.clearTimeout(this.saveTimer);
+    document.removeEventListener('pointerdown', this.outsideClick);
     this.plugin.player.audio.removeEventListener('volumechange', this.saveSettings);
     this.plugin.player.audio.removeEventListener('ratechange', this.saveSettings);
     await this.plugin.savePlayerSettings();
