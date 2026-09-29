@@ -3,7 +3,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import { AudioSidebarApp, type AudioSidebarController, type AudioSidebarSnapshot, type AudioTrack } from './ui/AudioSidebarApp';
 import { splitTrackName } from './ui/track-name';
 import { SingleAudioPlayer } from './player';
-import { shouldAcceptNativePlay } from './native-mirror';
 
 const VIEW_TYPE = 'cherrynik-audio-sidebar';
 const AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'ogg', 'flac', 'm4a', 'webm', 'aac']);
@@ -175,9 +174,6 @@ export default class AudioSidebarPlugin extends Plugin {
   followFilesSelection = true;
   private playerSettings = { volume: 1, rate: 1 };
   private mediaSessionOwned = false;
-  private nativeMirrors = new Set<HTMLAudioElement>();
-  private nativeMirrorSyncUntil = new WeakMap<HTMLAudioElement, number>();
-  private nativeMirrorUserIntentUntil = new WeakMap<HTMLAudioElement, number>();
   private durationCache = new Map<string, number | null>();
   private durationPending = new Map<string, Promise<number | null>>();
   private durationQueue: Array<{ file: TFile; resolve: (duration: number | null) => void }> = [];
@@ -283,25 +279,10 @@ export default class AudioSidebarPlugin extends Plugin {
       if (event.key === 'MediaTrackNext') { event.preventDefault(); this.player.playRelative(1); }
       if (event.key === 'MediaTrackPrevious') { event.preventDefault(); this.player.playRelative(-1); }
     });
-    this.registerDomEvent(this.app.workspace.containerEl, 'play', event => void this.handoffNativeAudio(event), true);
-    this.registerDomEvent(this.app.workspace.containerEl, 'pause', event => this.handleNativePause(event), true);
-    this.registerDomEvent(this.app.workspace.containerEl, 'seeking', event => this.handleNativeSeek(event), true);
-    this.registerDomEvent(this.app.workspace.containerEl, 'pointerdown', event => this.rememberNativeMirrorIntent(event), true);
-    this.registerDomEvent(window, 'focus', () => this.resynchronizeNativeMirrors());
-    this.registerDomEvent(document, 'visibilitychange', () => this.resynchronizeNativeMirrors());
     this.registerDomEvent(this.app.workspace.containerEl, 'click', event => {
+      if (this.handleAudioFileExplorerClick(event)) return;
       this.followFolderClick(event);
-      if (event.detail === 2) this.playAudioFileFromExplorer(event);
     }, true);
-    this.registerDomEvent(this.app.workspace.containerEl, 'dblclick', event => this.playAudioFileFromExplorer(event), true);
-    this.registerEvent(this.app.workspace.on('file-open', file => {
-      if (!(file instanceof TFile) || !AUDIO_EXTENSIONS.has(file.extension.toLowerCase())) return;
-      if (this.followFilesSelection && file.parent) this.selectFolder(file.parent);
-      for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
-        if (leaf.view instanceof AudioSidebarView) leaf.view.focusTrack(file.path);
-      }
-      this.attachNativeMirror(file);
-    }));
     this.registerEvent(this.app.vault.on('create', file => {
       if (file instanceof TFile && AUDIO_EXTENSIONS.has(file.extension.toLowerCase())) this.refreshFolderViews();
     }));
@@ -323,9 +304,6 @@ export default class AudioSidebarPlugin extends Plugin {
 
   resetPlayer(): void {
     this.player = new SingleAudioPlayer(this.app, () => this.refreshViews(), error => new Notice(`Could not play audio: ${error}`), this.playerSettings);
-    for (const event of ['play', 'pause', 'timeupdate', 'loadedmetadata', 'ratechange'] as const) {
-      this.player.audio.addEventListener(event, () => this.syncNativeMirrors());
-    }
   }
   async savePlayerSettings(): Promise<void> {
     this.playerSettings.volume = this.player.volume;
@@ -351,7 +329,6 @@ export default class AudioSidebarPlugin extends Plugin {
       if (leaf.view instanceof AudioSidebarView) leaf.view.updatePlayer();
     }
     this.updateMediaSession();
-    this.syncNativeMirrors();
   }
   private handleRename(file: TAbstractFile, oldPath: string): void {
     const newPath = file.path;
@@ -368,69 +345,6 @@ export default class AudioSidebarPlugin extends Plugin {
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
       if (leaf.view instanceof AudioSidebarView) leaf.view.refreshFolder();
     }
-  }
-  private syncNativeMirrors(): void {
-    for (const mirror of [...this.nativeMirrors]) {
-      if (!mirror.isConnected) { this.nativeMirrors.delete(mirror); continue; }
-      mirror.muted = true;
-      mirror.playbackRate = this.player.rate;
-      if (mirror.readyState >= HTMLMediaElement.HAVE_METADATA && Math.abs(mirror.currentTime - this.player.position) > 0.35) {
-        this.markNativeMirrorSync(mirror);
-        mirror.currentTime = Math.min(this.player.position, Math.max(0, mirror.duration - 0.05));
-      }
-      if (this.player.wantsPlayback && mirror.paused && mirror.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-        this.markNativeMirrorSync(mirror);
-        void mirror.play().catch(() => undefined);
-      }
-      else if (!this.player.wantsPlayback && !mirror.paused) {
-        this.markNativeMirrorSync(mirror);
-        mirror.pause();
-      }
-    }
-  }
-  private markNativeMirrorSync(audio: HTMLAudioElement, duration = 500): void {
-    this.nativeMirrorSyncUntil.set(audio, performance.now() + duration);
-  }
-  private isNativeMirrorSyncing(audio: HTMLAudioElement): boolean {
-    return performance.now() < (this.nativeMirrorSyncUntil.get(audio) ?? 0);
-  }
-  private rememberNativeMirrorIntent(event: PointerEvent): void {
-    const target = event.target;
-    if (!(target instanceof HTMLAudioElement) || !this.nativeMirrors.has(target)) return;
-    this.nativeMirrorUserIntentUntil.set(target, performance.now() + 1200);
-  }
-  private hasRecentNativeMirrorIntent(audio: HTMLAudioElement): boolean {
-    return performance.now() < (this.nativeMirrorUserIntentUntil.get(audio) ?? 0);
-  }
-  private resynchronizeNativeMirrors(): void {
-    for (const mirror of this.nativeMirrors) this.markNativeMirrorSync(mirror, 1200);
-    this.syncNativeMirrors();
-    const file = this.player.file;
-    if (file) this.attachNativeMirror(file);
-    requestAnimationFrame(() => this.syncNativeMirrors());
-    window.setTimeout(() => {
-      if (this.player.file) this.attachNativeMirror(this.player.file);
-      this.syncNativeMirrors();
-    }, 250);
-  }
-  private attachNativeMirror(file: TFile): void {
-    const attach = (attempt: number): void => {
-      if (this.player.file?.path !== file.path) return;
-      let attached = false;
-      const activeView = this.app.workspace.activeLeaf?.view.containerEl ?? this.app.workspace.containerEl;
-      for (const audio of activeView.querySelectorAll<HTMLAudioElement>('audio')) {
-        if (audio.closest('.audio-sb-view')) continue;
-        this.nativeMirrors.add(audio);
-        this.markNativeMirrorSync(audio, 1000);
-        audio.muted = true;
-        audio.addEventListener('loadedmetadata', () => this.syncNativeMirrors(), { once: true });
-        audio.addEventListener('canplay', () => this.syncNativeMirrors(), { once: true });
-        attached = true;
-      }
-      this.syncNativeMirrors();
-      if (!attached && attempt < 8) window.setTimeout(() => attach(attempt + 1), 100 * (attempt + 1));
-    };
-    window.setTimeout(() => attach(0), 0);
   }
   private updateMediaSession(): void {
     const session = navigator.mediaSession;
@@ -470,23 +384,31 @@ export default class AudioSidebarPlugin extends Plugin {
     if (!(folder instanceof TFolder)) return;
     this.selectFolder(folder);
   }
-  private playAudioFileFromExplorer(event: MouseEvent): void {
+  private handleAudioFileExplorerClick(event: MouseEvent): boolean {
     const target = event.target instanceof Element ? event.target : null;
     const standardEntry = target?.closest<HTMLElement>('.nav-file');
     const standardRow = target?.closest<HTMLElement>('.nav-file-title')
       ?? standardEntry?.querySelector<HTMLElement>('.nav-file-title');
     const nestedRow = target?.closest<HTMLElement>('.nv-row');
     const path = standardRow?.dataset.path ?? standardEntry?.dataset.path ?? nestedRow?.dataset.key;
-    if (!path) return;
+    if (!path) return false;
     const file = this.app.vault.getAbstractFileByPath(path);
-    if (!(file instanceof TFile) || !AUDIO_EXTENSIONS.has(file.extension.toLowerCase())) return;
+    if (!(file instanceof TFile) || !AUDIO_EXTENSIONS.has(file.extension.toLowerCase())) return false;
     event.preventDefault();
-    if (this.player.file?.path === file.path) {
-      if (!this.player.playing) this.player.resume();
-      return;
+    event.stopImmediatePropagation();
+    if (this.followFilesSelection && file.parent) this.selectFolder(file.parent);
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
+      if (leaf.view instanceof AudioSidebarView) leaf.view.focusTrack(file.path);
     }
-    const queue = file.parent ? this.findAudioInFolder(file.parent).map(track => track.path) : [file.path];
-    this.player.play(file, queue, file.parent?.name || 'Audio');
+    if (event.detail >= 2) {
+      if (this.player.file?.path === file.path) {
+        if (!this.player.playing) this.player.resume();
+      } else {
+        const queue = file.parent ? this.findAudioInFolder(file.parent).map(track => track.path) : [file.path];
+        this.player.play(file, queue, file.parent?.name || 'Audio');
+      }
+    }
+    return true;
   }
   private selectFolder(folder: TFolder): void {
     if (this.selectedFolder?.path === folder.path) return;
@@ -495,54 +417,17 @@ export default class AudioSidebarPlugin extends Plugin {
       if (leaf.view instanceof AudioSidebarView && leaf.view.folderPath !== folder.path) leaf.view.showFolder(folder);
     }
   }
-  private async handoffNativeAudio(event: Event): Promise<void> {
-    const audio = event.target;
-    if (!(audio instanceof HTMLAudioElement) || audio.closest('.audio-sb-view')) return;
-    if (this.nativeMirrors.has(audio)) {
-      const acceptPlay = shouldAcceptNativePlay({
-        playerWantsPlayback: this.player.wantsPlayback,
-        mirrorIsSynchronizing: this.isNativeMirrorSyncing(audio),
-        hasRecentUserIntent: this.hasRecentNativeMirrorIntent(audio)
-      });
-      this.nativeMirrorUserIntentUntil.delete(audio);
-      if (acceptPlay) this.player.resume();
-      else if (!this.player.wantsPlayback && !audio.paused) {
-        this.markNativeMirrorSync(audio);
-        audio.pause();
-      }
-      return;
-    }
-    const source = audio.currentSrc || audio.src;
-    const file = this.app.vault.getFiles().find(candidate => AUDIO_EXTENSIONS.has(candidate.extension.toLowerCase()) &&
-      this.app.vault.getResourcePath(candidate).split('?')[0] === source.split('?')[0]);
-    if (!file) return;
-    const startTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
-    this.nativeMirrors.add(audio);
-    audio.muted = true;
-    await this.activateView();
-    const queue = file.parent ? this.findAudioInFolder(file.parent).map(item => item.path) : [file.path];
-    this.player.play(file, queue, file.parent?.name || 'Audio', startTime);
-    this.syncNativeMirrors();
-  }
-  private handleNativePause(event: Event): void {
-    const audio = event.target;
-    if (audio instanceof HTMLAudioElement && this.nativeMirrors.has(audio) && !this.isNativeMirrorSyncing(audio) && this.player.wantsPlayback) this.player.pause();
-  }
-  private handleNativeSeek(event: Event): void {
-    const audio = event.target;
-    if (!(audio instanceof HTMLAudioElement) || !this.nativeMirrors.has(audio) || this.isNativeMirrorSyncing(audio) || !this.player.file) return;
-    if (Math.abs(audio.currentTime - this.player.position) > 0.35) this.player.audio.currentTime = audio.currentTime;
-  }
   async revealCurrentFile(): Promise<void> {
     const file = this.player.file;
     if (!file) return;
     await this.revealFile(file);
   }
   async revealFile(file: TFile): Promise<void> {
-    this.selectFileInExplorer(file.path);
-    await this.app.workspace.getLeaf(false).openFile(file);
-    await (this.app as unknown as { commands: { executeCommandById(id: string): Promise<boolean> | boolean } })
-      .commands.executeCommandById('file-explorer:reveal-active-file');
+    const explorerLeaf = this.app.workspace.getLeavesOfType('file-explorer')[0];
+    const explorerView = explorerLeaf?.view as unknown as {
+      revealInFolder?: (target: TFile) => Promise<void> | void;
+    } | undefined;
+    await explorerView?.revealInFolder?.(file);
     this.selectFileInExplorer(file.path);
     requestAnimationFrame(() => this.selectFileInExplorer(file.path));
   }
