@@ -6,7 +6,7 @@ The fork keeps the original audio features and adds:
 
 - recursive audio discovery in nested folders;
 - automatic loading when an Audio folder is selected in Files or Nested Pages;
-- a persistent player that continues while changing folders and notes.
+- a persistent player that always continues while changing folders and notes.
 - a compact native-player interface with icon-only controls.
 - previous and next controls that keep the active folder queue while browsing.
 

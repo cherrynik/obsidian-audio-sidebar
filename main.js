@@ -867,7 +867,7 @@ class AudioSidebarView extends ItemView {
     // different folder. Removing an <audio> node from the sidebar does not
     // stop it while we retain a reference to it.
     const current = this._currentAudio;
-    if (this.plugin.settings.continuePlayback && current && !current.paused && !current.ended) {
+    if (current && !current.paused && !current.ended) {
       if (!this._detachedAudios) this._detachedAudios = new Set();
       this._detachedAudios.add(current);
       if (this._persistentAudioEl) this._persistentAudioEl.appendChild(current);
@@ -889,11 +889,7 @@ class AudioSidebarView extends ItemView {
     this._loopBtn = headerActions.createEl('button', { cls: `audio-sb-loop-btn ${this._looping !== false ? 'audio-sb-loop-on' : 'audio-sb-loop-off'}` });
     this._loopBtn.onclick = () => this.toggleLoop();
     this.updateLoopButton();
-    this._continueBtn = headerActions.createEl('button', {
-      cls: `audio-sb-loop-btn ${this.plugin.settings.continuePlayback ? 'audio-sb-loop-on' : 'audio-sb-loop-off'}`
-    });
-    this._continueBtn.onclick = () => this.toggleContinue();
-    this.updateContinueButton();
+    this._continueBtn = null;
     this._overlapBtn = null;
 
     const searchWrap = content.createEl('div', { cls: 'audio-sb-search-wrap' });
@@ -1222,8 +1218,8 @@ class AudioSidebarSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName('Continue playback')
-      .setDesc('Automatically play the next track when the current one ends. Stops at the end of the list. Has no effect when track loop is enabled.')
+      .setName('Play next automatically')
+      .setDesc('Play the next track when the current one ends. Folder navigation never stops the current track.')
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.continuePlayback)
         .onChange(async (value) => {
