@@ -466,31 +466,26 @@ class AudioSidebarView extends ItemView {
 
     const toolbar = content.createEl('div', { cls: 'audio-sb-toolbar' });
     const loadRow = toolbar.createEl('div', { cls: 'audio-sb-load-row' });
-    const loadBtn = loadRow.createEl('button', { text: 'Load from selected folder', cls: 'audio-sb-load-btn' });
+    const loadBtn = loadRow.createEl('button', {
+      cls: 'audio-sb-cog-btn',
+      type: 'button',
+      attr: { 'aria-label': 'Reload selected folder', title: 'Reload selected folder' }
+    });
+    setIcon(loadBtn, 'refresh-cw');
     loadBtn.onclick = () => {
       const folder = this.plugin.selectedFolder;
       if (folder) this.loadFolder(folder);
     };
-    const sceneBtn = loadRow.createEl('button', { text: 'Create Scene', cls: 'audio-sb-load-btn audio-sb-scene-create-btn' });
-    sceneBtn.onclick = () => this.plugin.openSceneCreator();
     const cogBtn = loadRow.createEl('button', {
       cls: 'audio-sb-cog-btn',
       type: 'button',
-      attr: { 'aria-label': 'Audio Sidebar settings' }
+      attr: { 'aria-label': 'Audio Sidebar settings', title: 'Settings' }
     });
     setIcon(cogBtn, 'settings');
     cogBtn.onclick = () => {
       this.plugin.app.setting.open();
       this.plugin.app.setting.openTabById('cherrynik-audio-sidebar');
     };
-
-    this.renderVolumeControls(toolbar);
-
-    const sfxRow = toolbar.createEl('div', { cls: 'audio-sb-sfx-row' });
-    const sfxBtn = sfxRow.createEl('button', { text: 'Play sound', cls: 'audio-sb-load-btn audio-sb-sfx-btn' });
-    sfxBtn.onclick = () => this.plugin.openSfxPicker();
-    const loopBtn = sfxRow.createEl('button', { text: 'Play loop', cls: 'audio-sb-load-btn audio-sb-sfx-btn' });
-    loopBtn.onclick = () => this.plugin.openLoopPicker();
 
     this._bodyEl = content.createEl('div', { cls: 'audio-sb-body' });
     // Active players live here while the visible folder list is rebuilt.
@@ -528,7 +523,9 @@ class AudioSidebarView extends ItemView {
 
   updateLoopButton() {
     if (!this._loopBtn) return;
-    this._loopBtn.textContent = `Loop: ${this._looping ? 'On' : 'Off'}`;
+    this._loopBtn.empty();
+    setIcon(this._loopBtn, 'repeat-2');
+    this._loopBtn.setAttribute('aria-pressed', String(this._looping));
     this._loopBtn.title = this._looping ? 'Disable loop' : 'Enable loop';
   }
 
@@ -550,7 +547,9 @@ class AudioSidebarView extends ItemView {
   updateContinueButton() {
     if (!this._continueBtn) return;
     const enabled = !!this.plugin.settings.continuePlayback;
-    this._continueBtn.textContent = `Continue: ${enabled ? 'On' : 'Off'}`;
+    this._continueBtn.empty();
+    setIcon(this._continueBtn, 'list-end');
+    this._continueBtn.setAttribute('aria-pressed', String(enabled));
     this._continueBtn.title = enabled ? 'Disable continue playback' : 'Enable continue playback';
     this._continueBtn.classList.toggle('audio-sb-loop-on', enabled);
     this._continueBtn.classList.toggle('audio-sb-loop-off', !enabled);
@@ -851,19 +850,16 @@ class AudioSidebarView extends ItemView {
     const header = content.createEl('div', { cls: 'audio-sb-header' });
     header.createEl('span', { text: folder.name || 'Root', cls: 'audio-sb-folder-name' });
     this._countEl = header.createEl('span', { text: `${audioFiles.length} track${audioFiles.length !== 1 ? 's' : ''}`, cls: 'audio-sb-count' });
-    this._loopBtn = header.createEl('button', { cls: `audio-sb-loop-btn ${this._looping !== false ? 'audio-sb-loop-on' : 'audio-sb-loop-off'}` });
+    const headerActions = header.createEl('div', { cls: 'audio-sb-header-actions' });
+    this._loopBtn = headerActions.createEl('button', { cls: `audio-sb-loop-btn ${this._looping !== false ? 'audio-sb-loop-on' : 'audio-sb-loop-off'}` });
     this._loopBtn.onclick = () => this.toggleLoop();
     this.updateLoopButton();
-    this._continueBtn = header.createEl('button', {
+    this._continueBtn = headerActions.createEl('button', {
       cls: `audio-sb-loop-btn ${this.plugin.settings.continuePlayback ? 'audio-sb-loop-on' : 'audio-sb-loop-off'}`
     });
     this._continueBtn.onclick = () => this.toggleContinue();
     this.updateContinueButton();
-    this._overlapBtn = header.createEl('button', {
-      cls: `audio-sb-loop-btn ${this.plugin.settings.allowMusicOverlap ? 'audio-sb-loop-on' : 'audio-sb-loop-off'}`
-    });
-    this._overlapBtn.onclick = () => this.toggleMusicOverlap();
-    this.updateOverlapButton();
+    this._overlapBtn = null;
 
     const searchWrap = content.createEl('div', { cls: 'audio-sb-search-wrap' });
     const searchEl = searchWrap.createEl('input', { cls: 'audio-sb-search', type: 'text' });
@@ -924,17 +920,6 @@ class AudioSidebarView extends ItemView {
         }
       });
 
-      const copyBtn = playerRow.createEl('button', {
-        cls: 'audio-sb-track-copy',
-        type: 'button',
-        attr: { 'aria-label': 'Copy track codeblock' }
-      });
-      setIcon(copyBtn, 'copy');
-      copyBtn.onclick = () => {
-        const ref = `${folder.path}#${af.basename}`;
-        navigator.clipboard.writeText(`\`\`\`audiosidebar\n${ref}\n\`\`\``);
-        new Notice('Codeblock copied');
-      };
     }
   }
 
