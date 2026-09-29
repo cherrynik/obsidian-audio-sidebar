@@ -114,6 +114,14 @@ describe('AudioSidebarApp', () => {
     expect(controls.setVolume).toHaveBeenCalledWith(0.4);
   });
 
+  it('shows formatted seek and volume values without native button tooltips', () => {
+    render(<AudioSidebarApp controller={controller()} initialSnapshot={snapshot()} />);
+    expect(screen.getByText('00:32', { selector: 'output' })).toBeInTheDocument();
+    expect(screen.getByText('80%', { selector: 'output' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Repeat track' })).not.toHaveAttribute('aria-label');
+    expect(screen.getByRole('button', { name: 'Repeat track' })).not.toHaveAttribute('title');
+  });
+
   it('focuses the current track on pointer down so rerenders cannot swallow the click', () => {
     const controls = controller();
     render(<AudioSidebarApp controller={controls} initialSnapshot={snapshot()} />);

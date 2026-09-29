@@ -3,7 +3,7 @@ import {
   Eye, ListMusic, Pause, Play, Repeat, Repeat1, Settings, SkipBack,
   SkipForward, Volume2, VolumeX, X
 } from 'lucide-react';
-import { useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
+import { useState, useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 
 export type AudioTrack = {
   path: string;
@@ -67,7 +67,38 @@ type IconButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 function IconButton({ label, children, ...props }: IconButtonProps): React.JSX.Element {
-  return <button type="button" className="audio-sb-icon-btn" aria-label={label} {...props}>{children}</button>;
+  return <button type="button" className="audio-sb-icon-btn" {...props}>{children}<span className="audio-sb-sr-only">{label}</span></button>;
+}
+
+function RangeControl({ label, className, value, maximum, step, format, onChange }: {
+  label: string;
+  className?: string;
+  value: number;
+  maximum: number;
+  step: number;
+  format(value: number): string;
+  onChange(value: number): void;
+}): React.JSX.Element {
+  const [preview, setPreview] = useState<number | null>(null);
+  const shownValue = preview ?? value;
+  const updatePreview = (element: HTMLInputElement): void => setPreview(Number(element.value));
+  return <div className={`audio-sb-range${className ? ` ${className}` : ''}`} style={rangeStyle(shownValue, maximum)}>
+    <input
+      aria-label={label}
+      type="range"
+      min={0}
+      max={maximum}
+      step={step}
+      value={Math.min(value, maximum)}
+      onInput={event => updatePreview(event.currentTarget)}
+      onChange={event => onChange(Number(event.currentTarget.value))}
+      onPointerDown={event => updatePreview(event.currentTarget)}
+      onPointerUp={() => setPreview(null)}
+      onPointerCancel={() => setPreview(null)}
+      onBlur={() => setPreview(null)}
+    />
+    <output className="audio-sb-range-value" aria-hidden="true">{format(shownValue)}</output>
+  </div>;
 }
 
 export function AudioSidebarApp({ controller, initialSnapshot }: {
@@ -156,11 +187,11 @@ export function AudioSidebarApp({ controller, initialSnapshot }: {
       <div className="audio-sb-media">
         <div className="audio-sb-controls">
           <span className="audio-sb-time audio-sb-time-current">{formatTime(state.position)}</span>
-          <input aria-label="Seek" className="audio-sb-progress" style={rangeStyle(state.position, state.duration)} type="range" min={0} max={Math.max(0, state.duration)} step={0.01} value={Math.min(state.position, state.duration || 0)} onChange={event => controller.seek(Number(event.currentTarget.value))} />
+          <RangeControl label="Seek" className="audio-sb-progress" value={state.position} maximum={Math.max(0, state.duration)} step={0.01} format={formatTime} onChange={controller.seek} />
           <span className="audio-sb-time audio-sb-time-duration">{formatTime(state.duration)}</span>
           <div className="audio-sb-volume">
             <IconButton label={state.muted ? 'Unmute' : 'Mute'} onClick={controller.toggleMute}>{state.muted ? <VolumeX /> : <Volume2 />}</IconButton>
-            <input aria-label="Volume" style={rangeStyle(state.muted ? 0 : state.volume, 1)} type="range" min={0} max={1} step={0.01} value={state.muted ? 0 : state.volume} onChange={event => controller.setVolume(Number(event.currentTarget.value))} />
+            <RangeControl label="Volume" value={state.muted ? 0 : state.volume} maximum={1} step={0.01} format={value => `${Math.round(value * 100)}%`} onChange={controller.setVolume} />
           </div>
           <div className="audio-sb-queue-wrap" onMouseEnter={() => controller.toggleQueue(true)} onMouseLeave={() => controller.toggleQueue(false)}>
             <Popover.Root open={state.queueOpen} onOpenChange={controller.toggleQueue}>
