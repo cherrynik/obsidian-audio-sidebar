@@ -2,8 +2,12 @@
 .audio-sb-view {
   display: flex;
   flex-direction: column;
+  width: 100%;
   height: 100%;
   min-height: 0;
+  padding: 0 !important;
+  overflow: hidden;
+  box-sizing: border-box;
   --plyr-color-main: var(--interactive-accent);
   --plyr-audio-controls-background: transparent;
   --plyr-audio-control-color: var(--text-normal);
@@ -83,7 +87,10 @@
 .audio-sb-footer {
   position: relative;
   flex: 0 0 auto;
+  width: 100%;
+  margin: 0;
   padding: 10px 12px 11px;
+  box-sizing: border-box;
   border-top: 1px solid var(--background-modifier-border);
   background: var(--background-primary);
   box-shadow: 0 -8px 24px color-mix(in srgb, var(--background-primary) 82%, transparent);
@@ -233,9 +240,9 @@
 .audio-sb-media { min-width: 0; }
 .audio-sb-media .plyr--audio .plyr__controls {
   display: grid;
-  grid-template-columns: 38px minmax(108px, 1.5fr) 38px minmax(78px, .75fr) 30px;
+  grid-template-columns: 38px minmax(120px, 1fr) 38px 98px 30px;
   align-items: center;
-  gap: 4px;
+  gap: 0;
   padding: 0;
 }
 .audio-sb-media .plyr__control {
@@ -250,7 +257,7 @@
   background: transparent !important;
   color: var(--text-normal);
 }
-.audio-sb-media .plyr__progress__container { grid-column: 2; grid-row: 1; min-width: 48px; }
+.audio-sb-media .plyr__progress__container { grid-column: 2; grid-row: 1; min-width: 48px; margin: 0 9px; padding: 0 !important; }
 .audio-sb-media .plyr__time--current { grid-column: 1; grid-row: 1; }
 .audio-sb-media .plyr__time--duration { grid-column: 3; grid-row: 1; }
 .audio-sb-media .plyr__time--duration::before { content: '' !important; margin: 0 !important; }
