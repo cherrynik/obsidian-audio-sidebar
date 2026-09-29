@@ -357,16 +357,24 @@
   border-radius: 999px;
   background: linear-gradient(to right, var(--interactive-accent) 0 var(--audio-sb-range-progress), var(--background-modifier-border) var(--audio-sb-range-progress) 100%);
 }
-.audio-sb-media input[type='range']::-webkit-slider-thumb {
-  width: 12px;
-  height: 12px;
-  margin-top: 0;
-  box-sizing: border-box;
-  appearance: none;
-  border: 0;
-  border-radius: 50%;
-  background: var(--background-primary);
-  box-shadow: 0 0 0 1px var(--background-modifier-border);
+.audio-sb-media input[type='range']::-webkit-slider-thumb,
+.audio-sb-media input[type='range']:hover::-webkit-slider-thumb,
+.audio-sb-media input[type='range']:focus::-webkit-slider-thumb,
+.audio-sb-media input[type='range']:active::-webkit-slider-thumb {
+  width: 12px !important;
+  min-width: 12px !important;
+  max-width: 12px !important;
+  height: 12px !important;
+  min-height: 12px !important;
+  max-height: 12px !important;
+  margin-top: 2px !important;
+  box-sizing: border-box !important;
+  appearance: none !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: var(--background-primary) !important;
+  box-shadow: 0 0 0 1px var(--background-modifier-border) !important;
+  transform: none !important;
 }
 .audio-sb-media input[type='range']::-moz-range-track {
   height: 4px;
@@ -380,6 +388,7 @@
   border-radius: 50%;
   background: var(--background-primary);
   box-shadow: 0 0 0 1px var(--background-modifier-border);
+  transform: translateY(2px);
 }
 .audio-sb-speed-popup[data-state='open'],
 .audio-sb-queue-popup[data-state='open'] {
