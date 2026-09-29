@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { AudioSidebarApp, type AudioSidebarController, type AudioSidebarSnapshot, type AudioTrack } from './ui/AudioSidebarApp';
 import { splitTrackName } from './ui/track-name';
 import { SingleAudioPlayer } from './player';
+import { shouldAcceptNativePlay } from './native-mirror';
 
 const VIEW_TYPE = 'cherrynik-audio-sidebar';
 const AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'ogg', 'flac', 'm4a', 'webm', 'aac']);
@@ -158,6 +159,7 @@ export default class AudioSidebarPlugin extends Plugin {
   private mediaSessionOwned = false;
   private nativeMirrors = new Set<HTMLAudioElement>();
   private nativeMirrorSyncUntil = new WeakMap<HTMLAudioElement, number>();
+  private nativeMirrorUserIntentUntil = new WeakMap<HTMLAudioElement, number>();
   private durationCache = new Map<string, number | null>();
   private durationPending = new Map<string, Promise<number | null>>();
   private durationQueue: Array<{ file: TFile; resolve: (duration: number | null) => void }> = [];
@@ -266,6 +268,9 @@ export default class AudioSidebarPlugin extends Plugin {
     this.registerDomEvent(this.app.workspace.containerEl, 'play', event => void this.handoffNativeAudio(event), true);
     this.registerDomEvent(this.app.workspace.containerEl, 'pause', event => this.handleNativePause(event), true);
     this.registerDomEvent(this.app.workspace.containerEl, 'seeking', event => this.handleNativeSeek(event), true);
+    this.registerDomEvent(this.app.workspace.containerEl, 'pointerdown', event => this.rememberNativeMirrorIntent(event), true);
+    this.registerDomEvent(window, 'focus', () => this.resynchronizeNativeMirrors());
+    this.registerDomEvent(document, 'visibilitychange', () => this.resynchronizeNativeMirrors());
     this.registerDomEvent(this.app.workspace.containerEl, 'click', event => this.followFolderClick(event), true);
     this.registerEvent(this.app.workspace.on('file-open', file => {
       if (!(file instanceof TFile) || !AUDIO_EXTENSIONS.has(file.extension.toLowerCase())) return;
@@ -364,6 +369,25 @@ export default class AudioSidebarPlugin extends Plugin {
   private isNativeMirrorSyncing(audio: HTMLAudioElement): boolean {
     return performance.now() < (this.nativeMirrorSyncUntil.get(audio) ?? 0);
   }
+  private rememberNativeMirrorIntent(event: PointerEvent): void {
+    const target = event.target;
+    if (!(target instanceof HTMLAudioElement) || !this.nativeMirrors.has(target)) return;
+    this.nativeMirrorUserIntentUntil.set(target, performance.now() + 1200);
+  }
+  private hasRecentNativeMirrorIntent(audio: HTMLAudioElement): boolean {
+    return performance.now() < (this.nativeMirrorUserIntentUntil.get(audio) ?? 0);
+  }
+  private resynchronizeNativeMirrors(): void {
+    for (const mirror of this.nativeMirrors) this.markNativeMirrorSync(mirror, 1200);
+    this.syncNativeMirrors();
+    const file = this.player.file;
+    if (file) this.attachNativeMirror(file);
+    requestAnimationFrame(() => this.syncNativeMirrors());
+    window.setTimeout(() => {
+      if (this.player.file) this.attachNativeMirror(this.player.file);
+      this.syncNativeMirrors();
+    }, 250);
+  }
   private attachNativeMirror(file: TFile): void {
     const attach = (attempt: number): void => {
       if (this.player.file?.path !== file.path) return;
@@ -432,7 +456,17 @@ export default class AudioSidebarPlugin extends Plugin {
     const audio = event.target;
     if (!(audio instanceof HTMLAudioElement) || audio.closest('.audio-sb-view')) return;
     if (this.nativeMirrors.has(audio)) {
-      if (!this.player.wantsPlayback) this.player.resume();
+      const acceptPlay = shouldAcceptNativePlay({
+        playerWantsPlayback: this.player.wantsPlayback,
+        mirrorIsSynchronizing: this.isNativeMirrorSyncing(audio),
+        hasRecentUserIntent: this.hasRecentNativeMirrorIntent(audio)
+      });
+      this.nativeMirrorUserIntentUntil.delete(audio);
+      if (acceptPlay) this.player.resume();
+      else if (!this.player.wantsPlayback && !audio.paused) {
+        this.markNativeMirrorSync(audio);
+        audio.pause();
+      }
       return;
     }
     const source = audio.currentSrc || audio.src;
