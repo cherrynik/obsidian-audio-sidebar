@@ -87,9 +87,9 @@ function RangeControl({ label, className, value, maximum, step, format, onChange
     setAdjusting(false);
     setPreview(null);
   };
-  return <div className={`audio-sb-range${adjusting ? ' is-adjusting' : ''}${className ? ` ${className}` : ''}`} style={rangeStyle(shownValue, maximum)}>
+  return <label className={`audio-sb-range${adjusting ? ' is-adjusting' : ''}${className ? ` ${className}` : ''}`} style={rangeStyle(shownValue, maximum)}>
+    <span className="audio-sb-sr-only">{label}</span>
     <input
-      aria-label={label}
       type="range"
       min={0}
       max={maximum}
@@ -103,7 +103,7 @@ function RangeControl({ label, className, value, maximum, step, format, onChange
       onBlur={finishAdjusting}
     />
     <output className="audio-sb-range-value" aria-hidden="true">{format(shownValue)}</output>
-  </div>;
+  </label>;
 }
 
 export function AudioSidebarApp({ controller, initialSnapshot }: {

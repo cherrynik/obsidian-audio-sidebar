@@ -120,6 +120,8 @@ describe('AudioSidebarApp', () => {
     expect(screen.getByText('80%', { selector: 'output' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Repeat track' })).not.toHaveAttribute('aria-label');
     expect(screen.getByRole('button', { name: 'Repeat track' })).not.toHaveAttribute('title');
+    expect(screen.getByRole('slider', { name: 'Seek' })).not.toHaveAttribute('aria-label');
+    expect(screen.getByRole('slider', { name: 'Volume' })).not.toHaveAttribute('aria-label');
   });
 
   it('shows a range value only while the pointer is held down', () => {
