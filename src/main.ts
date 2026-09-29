@@ -40,6 +40,9 @@ class AudioSidebarView extends ItemView {
   private speedPopup!: HTMLElement;
   private plyr?: Plyr;
   private saveTimer?: number;
+  private queueSignature = '';
+  private durationObserver?: IntersectionObserver;
+  private durationTargets = new WeakMap<Element, TFile>();
   private saveSettings = (): void => {
     window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => void this.plugin.savePlayerSettings(), 600);
@@ -189,10 +192,7 @@ class AudioSidebarView extends ItemView {
       copy.createSpan({ text: label.title, cls: 'audio-sb-track-title' });
       if (label.artist) copy.createSpan({ text: label.artist, cls: 'audio-sb-track-artist' });
       const duration = row.createSpan({ cls: 'audio-sb-track-duration' });
-      const probe = document.createElement('audio');
-      probe.preload = 'metadata';
-      probe.src = this.app.vault.getResourcePath(file);
-      probe.addEventListener('loadedmetadata', () => { duration.textContent = formatTime(probe.duration); }, { once: true });
+      this.showDurationWhenVisible(file, duration);
       row.addEventListener('click', event => {
         if ((event.target as Element | null)?.closest('button')) return;
         activateTrack();
@@ -210,6 +210,20 @@ class AudioSidebarView extends ItemView {
     this.list.querySelectorAll<HTMLElement>('.audio-sb-item').forEach(row => {
       row.toggleClass('audio-sb-hidden', !!query && !row.dataset.name?.includes(query));
     });
+  }
+
+  private showDurationWhenVisible(file: TFile, target: HTMLElement): void {
+    this.durationTargets.set(target, file);
+    this.durationObserver ??= new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const durationTarget = entry.target as HTMLElement;
+        const durationFile = this.durationTargets.get(durationTarget);
+        this.durationObserver?.unobserve(durationTarget);
+        if (durationFile) this.plugin.showDuration(durationFile, durationTarget);
+      }
+    }, { rootMargin: '100px' });
+    this.durationObserver.observe(target);
   }
 
   private updateTrackList(): void {
@@ -285,6 +299,12 @@ class AudioSidebarView extends ItemView {
 
   private updateQueue(): void {
     if (!this.queuePopup) return;
+    const signature = `${this.plugin.player.queueName}\n${this.plugin.player.queuePaths.join('\n')}`;
+    if (signature === this.queueSignature) {
+      this.updateQueueState();
+      return;
+    }
+    this.queueSignature = signature;
     const scroll = this.queuePopup.scrollTop;
     this.queuePopup.empty();
     this.queuePopup.createDiv({ text: this.plugin.player.queueName || 'Queue', cls: 'audio-sb-queue-heading' });
@@ -292,6 +312,7 @@ class AudioSidebarView extends ItemView {
       const file = this.app.vault.getAbstractFileByPath(path);
       if (!(file instanceof TFile)) continue;
       const row = this.queuePopup.createEl('button', { cls: 'audio-sb-queue-item', type: 'button' });
+      row.dataset.path = path;
       const icon = row.createSpan({ cls: 'audio-sb-queue-play' });
       setIcon(icon, path === this.plugin.player.file?.path && this.plugin.player.playing ? 'pause' : 'play');
       const label = trackParts(file.basename);
@@ -299,10 +320,7 @@ class AudioSidebarView extends ItemView {
       copy.createSpan({ text: label.title, cls: 'audio-sb-track-title' });
       if (label.artist) copy.createSpan({ text: label.artist, cls: 'audio-sb-track-artist' });
       const duration = row.createSpan({ cls: 'audio-sb-track-duration' });
-      const probe = document.createElement('audio');
-      probe.preload = 'metadata';
-      probe.src = this.app.vault.getResourcePath(file);
-      probe.addEventListener('loadedmetadata', () => { duration.textContent = formatTime(probe.duration); }, { once: true });
+      this.showDurationWhenVisible(file, duration);
       row.toggleClass('audio-sb-queue-current', path === this.plugin.player.file?.path);
       row.addEventListener('click', () => {
         if (this.plugin.player.file?.path === file.path) this.plugin.player.toggle();
@@ -315,8 +333,21 @@ class AudioSidebarView extends ItemView {
     this.queuePopup.scrollTop = scroll;
   }
 
+  private updateQueueState(): void {
+    this.queuePopup.querySelectorAll<HTMLElement>('.audio-sb-queue-item').forEach(row => {
+      const active = row.dataset.path === this.plugin.player.file?.path;
+      row.toggleClass('audio-sb-queue-current', active);
+      const icon = row.querySelector<HTMLElement>('.audio-sb-queue-play');
+      if (icon) {
+        icon.empty();
+        setIcon(icon, active && this.plugin.player.playing ? 'pause' : 'play');
+      }
+    });
+  }
+
   async onClose(): Promise<void> {
     window.clearTimeout(this.saveTimer);
+    this.durationObserver?.disconnect();
     this.plugin.player.audio.removeEventListener('volumechange', this.saveSettings);
     this.plugin.player.audio.removeEventListener('volumechange', this.updateVolumeIcon);
     this.plugin.player.audio.removeEventListener('ratechange', this.saveSettings);
@@ -335,6 +366,10 @@ export default class AudioSidebarPlugin extends Plugin {
   private mediaSessionOwned = false;
   private nativeMirrors = new Set<HTMLAudioElement>();
   private nativeMirrorSyncUntil = new WeakMap<HTMLAudioElement, number>();
+  private durationCache = new Map<string, number>();
+  private durationPending = new Map<string, Promise<number | null>>();
+  private durationQueue: Array<{ file: TFile; resolve: (duration: number | null) => void }> = [];
+  private activeDurationRequests = 0;
 
   focusCurrentTrack(): void {
     const file = this.player.file;
@@ -351,6 +386,51 @@ export default class AudioSidebarPlugin extends Plugin {
     }).setting;
     setting?.open();
     setting?.openTabById(this.manifest.id);
+  }
+
+  showDuration(file: TFile, target: HTMLElement): void {
+    const cached = this.durationCache.get(file.path);
+    if (cached != null) {
+      target.textContent = formatTime(cached);
+      return;
+    }
+    let pending = this.durationPending.get(file.path);
+    if (!pending) {
+      const request = new Promise<number | null>(resolve => {
+        this.durationQueue.push({ file, resolve });
+        this.drainDurationQueue();
+      }).finally(() => this.durationPending.delete(file.path));
+      this.durationPending.set(file.path, request);
+      pending = request;
+    }
+    void pending.then(duration => {
+      if (duration == null) return;
+      this.durationCache.set(file.path, duration);
+      if (target.isConnected) target.textContent = formatTime(duration);
+    });
+  }
+
+  private drainDurationQueue(): void {
+    while (this.activeDurationRequests < 2 && this.durationQueue.length) {
+      const job = this.durationQueue.shift();
+      if (!job) return;
+      this.activeDurationRequests += 1;
+      const probe = document.createElement('audio');
+      let finished = false;
+      const finish = (duration: number | null): void => {
+        if (finished) return;
+        finished = true;
+        probe.removeAttribute('src');
+        probe.load();
+        this.activeDurationRequests -= 1;
+        job.resolve(duration);
+        this.drainDurationQueue();
+      };
+      probe.preload = 'metadata';
+      probe.addEventListener('loadedmetadata', () => finish(Number.isFinite(probe.duration) ? probe.duration : null), { once: true });
+      probe.addEventListener('error', () => finish(null), { once: true });
+      probe.src = this.app.vault.getResourcePath(job.file);
+    }
   }
 
   async onload(): Promise<void> {
@@ -435,6 +515,9 @@ export default class AudioSidebarPlugin extends Plugin {
   }
   private handleRename(file: TAbstractFile, oldPath: string): void {
     const newPath = file.path;
+    const cachedDuration = this.durationCache.get(oldPath);
+    this.durationCache.delete(oldPath);
+    if (cachedDuration != null) this.durationCache.set(newPath, cachedDuration);
     this.player.queuePaths = this.player.queuePaths.map(path =>
       path === oldPath ? newPath : path.startsWith(`${oldPath}/`) ? `${newPath}${path.slice(oldPath.length)}` : path
     );
