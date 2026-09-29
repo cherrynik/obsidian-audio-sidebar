@@ -83,7 +83,7 @@ class AudioSidebarView extends ItemView {
     });
     this.location.addEventListener('click', () => void this.plugin.revealCurrentFile());
     const currentActions = currentTrack.createDiv({ cls: 'audio-sb-current-actions' });
-    this.iconButton(currentActions, 'eye', 'Focus current track', () => this.plugin.focusCurrentTrack()).addClass('audio-sb-focus-track');
+    this.iconButton(currentActions, 'eye', 'Focus current track', () => void this.plugin.focusCurrentTrack()).addClass('audio-sb-focus-track');
     this.iconButton(currentActions, 'x', 'Close player', () => this.plugin.player.stop()).addClass('audio-sb-close-player');
     if (!document.getElementById('cherrynik-plyr-icons')) {
       const icons = document.createElement('div');
@@ -148,8 +148,6 @@ class AudioSidebarView extends ItemView {
         .find(item => item.dataset.path === path);
       if (!row) return;
       row.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      row.tabIndex = -1;
-      row.focus({ preventScroll: true });
     };
     requestAnimationFrame(focusRow);
   }
@@ -371,9 +369,10 @@ export default class AudioSidebarPlugin extends Plugin {
   private durationQueue: Array<{ file: TFile; resolve: (duration: number | null) => void }> = [];
   private activeDurationRequests = 0;
 
-  focusCurrentTrack(): void {
+  async focusCurrentTrack(): Promise<void> {
     const file = this.player.file;
     if (!file?.parent) return;
+    await this.revealFile(file);
     this.selectFolder(file.parent);
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
       if (leaf.view instanceof AudioSidebarView) leaf.view.focusTrack(file.path);
