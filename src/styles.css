@@ -193,6 +193,7 @@
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
+  transform: translateY(1px);
 }
 .audio-sb-view button.audio-sb-current-location:hover,
 .audio-sb-view button.audio-sb-current-location:focus,
