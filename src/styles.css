@@ -53,20 +53,6 @@
   font-size: var(--font-small);
 }
 .audio-sb-search:focus { border-color: var(--interactive-accent); box-shadow: 0 0 0 1px var(--interactive-accent); }
-.audio-sb-list-fade {
-  position: relative;
-  z-index: 2;
-  flex: 0 0 14px;
-  height: 14px;
-  margin: -7px -2px -14px;
-  pointer-events: none;
-  background: linear-gradient(
-    to bottom,
-    var(--background-secondary) 0%,
-    color-mix(in srgb, var(--background-secondary) 72%, transparent) 58%,
-    transparent 100%
-  );
-}
 .audio-sb-list {
   flex: 1 1 auto;
   min-height: 0;
@@ -293,8 +279,15 @@
 }
 .audio-sb-view button.audio-sb-speed-option:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
 .audio-sb-view button.audio-sb-speed-option.is-active { color: var(--interactive-accent); font-weight: var(--font-semibold); }
-.audio-sb-media { min-width: 0; }
-.audio-sb-media .plyr__tooltip { display: none !important; }
+.audio-sb-media {
+  --plyr-range-thumb-height: 12px;
+  --plyr-range-track-height: 4px;
+  --plyr-range-thumb-active-shadow-width: 0;
+  min-width: 0;
+}
+.audio-sb-media .plyr__tooltip,
+.audio-sb-media .plyr__preview-thumb,
+body:has(.audio-sb-view:hover) > .tooltip { display: none !important; }
 .audio-sb-media .plyr--audio .plyr__controls {
   display: grid;
   grid-template-columns: 38px minmax(72px, 1fr) 38px minmax(82px, 104px) 30px;
@@ -336,10 +329,7 @@
   margin-left: 0 !important;
 }
 .audio-sb-media .plyr__progress__buffer {
-  width: 100% !important;
-  margin-right: 0 !important;
-  margin-left: 0 !important;
-  color: color-mix(in srgb, var(--text-muted) 34%, transparent) !important;
+  display: none !important;
 }
 .audio-sb-media .plyr__progress input[type='range']::-webkit-slider-runnable-track {
   background-color: var(--background-modifier-border) !important;
@@ -373,8 +363,9 @@
 .audio-sb-media .plyr__volume .plyr__control svg {
   width: 16px;
   height: 16px;
-  fill: currentColor !important;
+  fill: none !important;
   stroke: currentColor !important;
+  stroke-width: 2 !important;
 }
 .audio-sb-media .plyr__volume input[type='range'] {
   position: static;
@@ -384,29 +375,47 @@
   min-width: 44px;
   margin: 0;
 }
-.audio-sb-media input[type='range']::-webkit-slider-thumb {
+.audio-sb-media .plyr--full-ui input[type='range'] {
+  height: 20px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transition: none !important;
+}
+.audio-sb-media .plyr--full-ui input[type='range']::-webkit-slider-thumb {
+  appearance: none !important;
   width: 12px !important;
   height: 12px !important;
   min-width: 12px !important;
   min-height: 12px !important;
   margin-top: -4px !important;
+  border: 0 !important;
   border-radius: 50% !important;
   aspect-ratio: 1;
+  transform: none !important;
+  box-shadow: 0 0 0 1px var(--background-modifier-border) !important;
   transition: none !important;
 }
-.audio-sb-media input[type='range']::-moz-range-thumb {
+.audio-sb-media .plyr--full-ui input[type='range']::-moz-range-thumb {
   width: 12px !important;
   height: 12px !important;
   min-width: 12px !important;
   min-height: 12px !important;
+  border: 0 !important;
   border-radius: 50% !important;
+  transform: none !important;
+  box-shadow: 0 0 0 1px var(--background-modifier-border) !important;
   transition: none !important;
 }
-.audio-sb-media input[type='range']::-webkit-slider-runnable-track { height: 4px !important; transition: none !important; }
-.audio-sb-media input[type='range']::-moz-range-track { height: 4px !important; transition: none !important; }
+.audio-sb-media .plyr--full-ui input[type='range']::-webkit-slider-runnable-track { height: 4px !important; transition: none !important; }
+.audio-sb-media .plyr--full-ui input[type='range']::-moz-range-track { height: 4px !important; transition: none !important; }
 .audio-sb-media .plyr--full-ui.plyr--audio input[type='range']:active::-webkit-slider-thumb,
 .audio-sb-media .plyr--full-ui.plyr--audio input[type='range']:active::-moz-range-thumb {
-  box-shadow: var(--plyr-range-thumb-shadow, 0 1px 1px #23282f26, 0 0 0 1px #23282f33) !important;
+  transform: none !important;
+  box-shadow: 0 0 0 1px var(--background-modifier-border) !important;
 }
 .audio-sb-queue-wrap { position: relative; }
 .audio-sb-queue-wrap:hover::before,

@@ -104,6 +104,11 @@ class AudioSidebarView extends ItemView {
       keyboard: { focused: true, global: false },
       tooltips: { controls: false, seek: false }
     });
+    this.media.querySelectorAll<HTMLElement>('[title], [aria-label], [data-tooltip-position]').forEach((element) => {
+      element.removeAttribute('title');
+      element.removeAttribute('aria-label');
+      element.removeAttribute('data-tooltip-position');
+    });
     this.muteButton = this.media.querySelector<HTMLButtonElement>("[data-plyr='mute']") || undefined;
     this.updateVolumeIcon();
     const transport = this.footer.createDiv({ cls: 'audio-sb-transport' });
@@ -173,7 +178,6 @@ class AudioSidebarView extends ItemView {
     const search = body.createEl('input', { cls: 'audio-sb-search', type: 'search', attr: { placeholder: 'Search tracks…', 'aria-label': 'Search tracks' } });
     search.value = this.search;
     search.addEventListener('input', () => { this.search = search.value; this.filterRows(); });
-    body.createDiv({ cls: 'audio-sb-list-fade' });
     this.list = body.createDiv({ cls: 'audio-sb-list' });
     for (const file of files) {
       const row = this.list.createDiv({ cls: 'audio-sb-item' });
