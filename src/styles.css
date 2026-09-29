@@ -115,9 +115,10 @@
   white-space: nowrap;
 }
 .audio-sb-view button.audio-sb-current-location {
-  display: block;
-  flex: 1 1 auto;
+  display: inline-block;
+  flex: 0 1 auto;
   min-width: 0;
+  max-width: 55%;
   height: 16px;
   margin: 0;
   padding: 0;
@@ -281,11 +282,20 @@
 .audio-sb-media input[type='range']::-webkit-slider-runnable-track { height: 4px !important; }
 .audio-sb-media input[type='range']::-moz-range-track { height: 4px !important; }
 .audio-sb-queue-wrap { position: relative; }
+.audio-sb-queue-wrap:hover::before,
+.audio-sb-queue-wrap:focus-within::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  width: min(420px, calc(100vw - 32px));
+  height: 10px;
+}
 .audio-sb-queue-popup {
   position: absolute;
   z-index: 30;
   right: 0;
-  bottom: calc(100% + 9px);
+  bottom: calc(100% + 6px);
   width: min(420px, calc(100vw - 32px));
   max-height: min(360px, 52vh);
   overflow-y: auto;

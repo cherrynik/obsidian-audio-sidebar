@@ -251,7 +251,8 @@ class AudioSidebarView extends ItemView {
       probe.addEventListener('loadedmetadata', () => { duration.textContent = formatTime(probe.duration); }, { once: true });
       row.toggleClass('audio-sb-queue-current', path === this.plugin.player.file?.path);
       row.addEventListener('click', () => {
-        this.plugin.player.play(file, this.plugin.player.queuePaths, this.plugin.player.queueName);
+        if (this.plugin.player.file?.path === file.path) this.plugin.player.toggle();
+        else this.plugin.player.play(file, this.plugin.player.queuePaths, this.plugin.player.queueName);
       });
     }
     this.queuePopup.scrollTop = scroll;
