@@ -10,6 +10,16 @@ const formatTime = (seconds: number): string => {
   const total = Math.max(0, Math.floor(Number(seconds) || 0));
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 };
+const trackParts = (name: string): { title: string; artist: string } => {
+  const separator = ' — ';
+  const index = name.indexOf(separator);
+  if (index < 0) return { title: name, artist: '' };
+  const left = name.slice(0, index).trim();
+  const right = name.slice(index + separator.length).trim();
+  return right.includes('@')
+    ? { title: left, artist: right }
+    : { title: right, artist: left };
+};
 
 class AudioSidebarView extends ItemView {
   private folder: TFolder | null = null;
@@ -17,11 +27,14 @@ class AudioSidebarView extends ItemView {
   private list!: HTMLElement;
   private footer!: HTMLElement;
   private title!: HTMLElement;
+  private artist!: HTMLElement;
   private media!: HTMLElement;
   private previous!: HTMLButtonElement;
   private next!: HTMLButtonElement;
   private queueButton!: HTMLButtonElement;
   private queuePopup!: HTMLElement;
+  private repeatButton!: HTMLButtonElement;
+  private speedButton!: HTMLButtonElement;
   private plyr?: Plyr;
   private saveTimer?: number;
   private outsideClick = (event: PointerEvent): void => {
@@ -45,7 +58,9 @@ class AudioSidebarView extends ItemView {
     const body = root.createDiv({ cls: 'audio-sb-body' });
     this.list = body.createDiv({ cls: 'audio-sb-list' });
     this.footer = root.createDiv({ cls: 'audio-sb-footer' });
-    this.title = this.footer.createDiv({ cls: 'audio-sb-current-title' });
+    const currentTrack = this.footer.createDiv({ cls: 'audio-sb-current-track' });
+    this.title = currentTrack.createDiv({ cls: 'audio-sb-current-title' });
+    this.artist = currentTrack.createDiv({ cls: 'audio-sb-current-artist' });
     if (!document.getElementById('cherrynik-plyr-icons')) {
       const icons = document.createElement('div');
       icons.id = 'cherrynik-plyr-icons';
@@ -56,8 +71,7 @@ class AudioSidebarView extends ItemView {
     this.media = this.footer.createDiv({ cls: 'audio-sb-media' });
     this.media.appendChild(this.plugin.player.audio);
     this.plyr = new Plyr(this.plugin.player.audio, {
-      controls: ['play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'settings'],
-      settings: ['speed', 'loop'],
+      controls: ['play', 'progress', 'current-time', 'duration', 'mute', 'volume'],
       speed: { selected: this.plugin.player.rate, options: [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] },
       volume: this.plugin.player.volume,
       loadSprite: false,
@@ -68,6 +82,10 @@ class AudioSidebarView extends ItemView {
     });
     const transport = this.footer.createDiv({ cls: 'audio-sb-transport' });
     this.footer.insertBefore(transport, this.media);
+    this.repeatButton = this.iconButton(transport, 'repeat-2', 'Repeat track', () => {
+      this.plugin.player.audio.loop = !this.plugin.player.audio.loop;
+      this.updateTransport();
+    });
     this.previous = this.iconButton(transport, 'skip-back', 'Previous track', () => this.plugin.player.playRelative(-1));
     const plyrPlay = this.media.querySelector<HTMLButtonElement>("[data-plyr='play']");
     if (plyrPlay) {
@@ -75,6 +93,13 @@ class AudioSidebarView extends ItemView {
       transport.appendChild(plyrPlay);
     }
     this.next = this.iconButton(transport, 'skip-forward', 'Next track', () => this.plugin.player.playRelative(1));
+    this.speedButton = transport.createEl('button', { cls: 'audio-sb-speed', type: 'button' });
+    this.speedButton.addEventListener('click', () => {
+      const rates = [0.75, 1, 1.25, 1.5, 2];
+      const current = rates.indexOf(this.plugin.player.rate);
+      this.plugin.player.audio.playbackRate = rates[(current + 1) % rates.length];
+      this.updateTransport();
+    });
     const controls = this.media.querySelector<HTMLElement>('.plyr__controls');
     const queueWrap = controls?.createDiv({ cls: 'audio-sb-queue-wrap' });
     if (queueWrap) {
@@ -117,7 +142,10 @@ class AudioSidebarView extends ItemView {
         else this.plugin.player.play(file, files.map(item => item.path), this.folder?.name || 'Audio');
       });
       button.addClass('audio-sb-track-play');
-      row.createSpan({ text: file.basename, cls: 'audio-sb-track-name' });
+      const label = trackParts(file.basename);
+      const copy = row.createDiv({ cls: 'audio-sb-track-copy' });
+      copy.createSpan({ text: label.title, cls: 'audio-sb-track-title' });
+      if (label.artist) copy.createSpan({ text: label.artist, cls: 'audio-sb-track-artist' });
       const duration = row.createSpan({ cls: 'audio-sb-track-duration' });
       const probe = document.createElement('audio');
       probe.preload = 'metadata';
@@ -145,19 +173,34 @@ class AudioSidebarView extends ItemView {
       const playing = active && this.plugin.player.playing;
       button.empty();
       setIcon(button, playing ? 'pause' : 'play');
-      button.setAttribute('aria-label', `${playing ? 'Pause' : 'Play'} ${row.querySelector('.audio-sb-track-name')?.textContent || ''}`);
+      button.setAttribute('aria-label', `${playing ? 'Pause' : 'Play'} ${row.querySelector('.audio-sb-track-title')?.textContent || ''}`);
     });
   }
 
   updatePlayer(): void {
     const hasTrack = !!this.plugin.player.file;
-    this.title.textContent = this.plugin.player.file?.basename || '';
+    const label = trackParts(this.plugin.player.file?.basename || '');
+    this.title.textContent = label.title;
+    this.artist.textContent = label.artist;
+    this.artist.toggleClass('audio-sb-hidden', !label.artist);
     this.footer.toggleClass('audio-sb-hidden', !hasTrack);
     this.previous.disabled = !hasTrack;
     this.next.disabled = !hasTrack;
     if (this.queueButton) this.queueButton.disabled = !this.plugin.player.queuePaths.length;
+    this.updateTransport();
     this.updateQueue();
     this.updateTrackList();
+  }
+
+  private updateTransport(): void {
+    if (!this.repeatButton || !this.speedButton) return;
+    this.repeatButton.empty();
+    setIcon(this.repeatButton, this.plugin.player.audio.loop ? 'repeat-1' : 'repeat-2');
+    this.repeatButton.toggleClass('is-active', this.plugin.player.audio.loop);
+    this.repeatButton.setAttribute('aria-pressed', String(this.plugin.player.audio.loop));
+    this.speedButton.textContent = `${this.plugin.player.rate}×`;
+    this.speedButton.setAttribute('aria-label', `Playback speed ${this.plugin.player.rate} times`);
+    this.speedButton.title = `Playback speed: ${this.plugin.player.rate}×`;
   }
 
   private iconButton(parent: HTMLElement, icon: string, label: string, action: () => void): HTMLButtonElement {
@@ -226,7 +269,7 @@ export default class AudioSidebarPlugin extends Plugin {
       if (event.key === 'MediaTrackPrevious') { event.preventDefault(); this.player.playRelative(-1); }
     });
     this.registerDomEvent(this.app.workspace.containerEl, 'play', event => void this.handoffNativeAudio(event), true);
-    this.registerDomEvent(this.app.workspace.containerEl, 'click', event => this.followFolderClick(event));
+    this.registerDomEvent(this.app.workspace.containerEl, 'click', event => this.followFolderClick(event), true);
     this.registerEvent(this.app.vault.on('delete', file => {
       if (file.path === this.player.file?.path) this.player.stop();
     }));
@@ -296,8 +339,13 @@ export default class AudioSidebarPlugin extends Plugin {
   private followFolderClick(event: MouseEvent): void {
     const target = event.target instanceof Element ? event.target : null;
     if (target?.closest('.collapse-icon')) return;
-    const path = (target?.closest('.nav-folder-title') as HTMLElement | null)?.dataset.path ?? (target?.closest('.nv-row') as HTMLElement | null)?.dataset.key;
+    const fileExplorerFolder = target?.closest('.nav-folder-title') as HTMLElement | null;
+    const path = fileExplorerFolder?.dataset.path ?? (target?.closest('.nv-row') as HTMLElement | null)?.dataset.key;
     if (!path || (path !== 'Audio' && !path.startsWith('Audio/'))) return;
+    if (fileExplorerFolder) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
     const folder = this.app.vault.getAbstractFileByPath(path);
     if (!(folder instanceof TFolder)) return;
     this.selectedFolder = folder;
