@@ -127,7 +127,9 @@
 }
 .audio-sb-view button.audio-sb-main-play:focus .audio-sb-main-play-surface,
 .audio-sb-view button.audio-sb-main-play:focus-visible .audio-sb-main-play-surface {
-  border-color: var(--text-on-accent);
+  border-color: transparent;
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
 }
 .audio-sb-view button.audio-sb-icon-btn:disabled { opacity: .35; cursor: default; }
 .audio-sb-item-active .audio-sb-track-play { color: var(--interactive-accent); }

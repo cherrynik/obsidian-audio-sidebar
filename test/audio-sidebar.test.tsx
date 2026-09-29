@@ -213,7 +213,10 @@ describe('theme-safe styles', () => {
     expect(css).toMatch(/\.audio-sb-icon-btn:focus-visible\s+\.audio-sb-icon-surface/);
     expect(css).toMatch(/\.audio-sb-icon-btn:focus\s+\.audio-sb-icon-surface/);
     expect(css).toMatch(/\.audio-sb-main-play:focus\s+\.audio-sb-main-play-surface/);
-    expect(css).toMatch(/\.audio-sb-main-play:focus-visible\s+\.audio-sb-main-play-surface\s*\{[^}]*border-color:\s*var\(--text-on-accent\)/s);
+    const primaryFocus = css.match(/\.audio-sb-main-play:focus-visible\s+\.audio-sb-main-play-surface\s*\{([^}]*)\}/s)?.[1] ?? '';
+    expect(primaryFocus).toContain('border-color: transparent');
+    expect(primaryFocus).toContain('outline: 2px solid var(--interactive-accent)');
+    expect(primaryFocus).toContain('outline-offset: 1px');
   });
 
   it('uses theme-aware colors for range value tooltips', () => {
