@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = {
   musicVolume: 100,
   sfxVolume: 100,
   loopVolume: 100,
+  playbackRate: 1,
   musicFadeMs: 1500
 };
 
@@ -458,7 +459,7 @@ class AudioSidebarView extends ItemView {
   // Rebuilds the entire sidebar DOM. Called once on open and again after a
   // settings change that requires a full redraw (e.g. overlap toggle).
   draw(folder) {
-    this._looping = false;
+    this._looping = this._looping === true;
     this._suppressPauseSync = false;
     const content = this.containerEl.children[1];
     content.empty();
@@ -473,6 +474,7 @@ class AudioSidebarView extends ItemView {
     this._nowPlayingListEl = this._footerEl.createEl('div', { cls: 'audio-sb-np-list' });
     this._upNextLabelEl = this._footerEl.createEl('div', { text: 'Up next', cls: 'audio-sb-footer-label audio-sb-up-next-label' });
     this._upNextListEl = this._footerEl.createEl('div', { cls: 'audio-sb-up-next-list' });
+    this.renderTimeline(this._footerEl);
     const playerSettings = this._footerEl.createEl('div', { cls: 'audio-sb-player-settings' });
     this._loopBtn = playerSettings.createEl('button', {
       cls: 'audio-sb-repeat-btn audio-sb-loop-off',
@@ -483,6 +485,7 @@ class AudioSidebarView extends ItemView {
     this._loopBtn.onclick = () => this.toggleLoop();
     this.updateLoopButton();
     this.renderGlobalVolume(playerSettings);
+    this.renderPlaybackSpeed(playerSettings);
 
     if (this._nowPlayingTimer) window.clearInterval(this._nowPlayingTimer);
     this._nowPlayingTimer = window.setInterval(() => this._refreshNowPlayingTimes(), 500);
@@ -497,9 +500,6 @@ class AudioSidebarView extends ItemView {
   toggleLoop() {
     this._looping = !this._looping;
     this.updateLoopButton();
-    this._loopBtn.classList.toggle('audio-sb-loop-on', this._looping);
-    this._loopBtn.classList.toggle('audio-sb-loop-off', !this._looping);
-    this.getTrackAudios().forEach(a => a.loop = this._looping);
   }
 
   toggleMusicOverlap() {
@@ -512,10 +512,12 @@ class AudioSidebarView extends ItemView {
   updateLoopButton() {
     if (!this._loopBtn) return;
     this._loopBtn.empty();
-    setIcon(this._loopBtn, 'repeat-2');
-    this._loopBtn.createEl('span', { text: 'Repeat', cls: 'audio-sb-repeat-label' });
+    setIcon(this._loopBtn, this._looping ? 'repeat-1' : 'repeat-2');
+    this._loopBtn.createEl('span', { text: this._looping ? 'Repeat 1' : 'Repeat', cls: 'audio-sb-repeat-label' });
     this._loopBtn.setAttribute('aria-pressed', String(this._looping));
-    this._loopBtn.title = this._looping ? 'Repeat is on' : 'Repeat is off';
+    this._loopBtn.title = this._looping ? 'Repeat current track: on' : 'Repeat current track: off';
+    this._loopBtn.classList.toggle('audio-sb-loop-on', this._looping);
+    this._loopBtn.classList.toggle('audio-sb-loop-off', !this._looping);
   }
 
   updateOverlapButton() {
@@ -652,28 +654,100 @@ class AudioSidebarView extends ItemView {
     return input;
   }
 
-  renderGlobalVolume(parentEl) {
-    const row = parentEl.createEl('label', { cls: 'audio-sb-global-volume' });
-    const icon = row.createEl('span', { cls: 'audio-sb-global-volume-icon' });
-    setIcon(icon, 'volume-2');
-    const input = row.createEl('input', {
-      cls: 'audio-sb-global-volume-slider',
+  renderTimeline(parentEl) {
+    const row = parentEl.createEl('div', { cls: 'audio-sb-timeline' });
+    this._timelineElapsed = row.createEl('span', { text: '0:00', cls: 'audio-sb-timeline-time' });
+    this._timelineInput = row.createEl('input', {
       type: 'range',
+      cls: 'audio-sb-timeline-slider',
+      attr: { min: '0', max: '100', step: '0.1', 'aria-label': 'Seek current track' }
+    });
+    this._timelineInput.disabled = true;
+    this._timelineInput.addEventListener('pointerdown', () => { this._timelineSeeking = true; });
+    const finishSeeking = () => {
+      this._timelineSeeking = false;
+      this.updateTimeline();
+    };
+    this._timelineInput.addEventListener('pointerup', finishSeeking);
+    this._timelineInput.addEventListener('pointercancel', finishSeeking);
+    this._timelineInput.addEventListener('blur', finishSeeking);
+    this._timelineInput.addEventListener('input', () => {
+      const audio = this._currentAudio;
+      if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
+      audio.currentTime = Math.min(audio.duration, Number(this._timelineInput.value));
+      this._timelineElapsed.textContent = this.formatTime(audio.currentTime);
+    });
+    this._timelineDuration = row.createEl('span', { text: '0:00', cls: 'audio-sb-timeline-time' });
+    this._timelineRow = row;
+  }
+
+  updateTimeline() {
+    if (!this._timelineInput) return;
+    const audio = this._currentAudio;
+    const duration = audio && Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+    this._timelineRow.toggleClass('audio-sb-hidden', !audio);
+    this._timelineInput.disabled = duration === 0;
+    this._timelineInput.max = String(duration || 100);
+    if (!this._timelineSeeking) this._timelineInput.value = String(Math.min(audio?.currentTime || 0, duration || 100));
+    this._timelineElapsed.textContent = this.formatTime(audio?.currentTime || 0);
+    this._timelineDuration.textContent = this.formatTime(duration);
+  }
+
+  createPlayerPopover(parentEl, iconName, label) {
+    const wrap = parentEl.createEl('div', { cls: 'audio-sb-control-wrap' });
+    const button = wrap.createEl('button', {
+      cls: 'audio-sb-control-btn', type: 'button',
+      attr: { 'aria-label': label, 'aria-expanded': 'false', title: label }
+    });
+    setIcon(button, iconName);
+    const popup = wrap.createEl('div', { cls: 'audio-sb-control-popup audio-sb-hidden' });
+    button.onclick = () => {
+      const opening = popup.classList.contains('audio-sb-hidden');
+      this._footerEl.querySelectorAll('.audio-sb-control-popup').forEach(other => other.classList.add('audio-sb-hidden'));
+      this._footerEl.querySelectorAll('.audio-sb-control-btn').forEach(other => other.setAttribute('aria-expanded', 'false'));
+      popup.classList.toggle('audio-sb-hidden', !opening);
+      button.setAttribute('aria-expanded', String(opening));
+    };
+    return popup;
+  }
+
+  renderGlobalVolume(parentEl) {
+    const popup = this.createPlayerPopover(parentEl, 'volume-2', 'Volume');
+    popup.createEl('span', { text: 'Volume', cls: 'audio-sb-control-label' });
+    const input = popup.createEl('input', {
+      cls: 'audio-sb-vertical-slider', type: 'range',
       attr: { min: '0', max: '100', step: '1', 'aria-label': 'Global volume' }
     });
     input.value = String(this.plugin.settings.masterVolume);
-    const value = row.createEl('span', {
-      text: `${this.plugin.settings.masterVolume}%`,
-      cls: 'audio-sb-global-volume-value'
+    const value = popup.createEl('span', {
+      text: `${this.plugin.settings.masterVolume}%`, cls: 'audio-sb-global-volume-value'
     });
     input.addEventListener('input', () => {
       value.textContent = `${input.value}%`;
       this.plugin.previewVolumeSetting('masterVolume', Number(input.value));
     });
-    input.addEventListener('change', () => {
-      this.plugin.updateVolumeSetting('masterVolume', Number(input.value));
-    });
+    input.addEventListener('change', () => this.plugin.updateVolumeSetting('masterVolume', Number(input.value)));
     this._masterVolumeInput = input;
+  }
+
+  renderPlaybackSpeed(parentEl) {
+    const popup = this.createPlayerPopover(parentEl, 'gauge', 'Playback speed');
+    popup.createEl('span', { text: 'Speed', cls: 'audio-sb-control-label' });
+    const input = popup.createEl('input', {
+      cls: 'audio-sb-vertical-slider', type: 'range',
+      attr: { min: '0.5', max: '2', step: '0.05', 'aria-label': 'Playback speed' }
+    });
+    input.value = String(this.plugin.clampPlaybackRate(this.plugin.settings.playbackRate));
+    const value = popup.createEl('span', { cls: 'audio-sb-speed-value' });
+    const update = () => {
+      const speed = this.plugin.clampPlaybackRate(input.value);
+      value.textContent = `${speed.toFixed(2).replace(/0$/, '').replace(/\.0$/, '')}×`;
+      this.plugin.settings.playbackRate = speed;
+      this.getTrackAudios().forEach(audio => { audio.playbackRate = speed; });
+    };
+    input.addEventListener('input', update);
+    input.addEventListener('change', () => this.plugin.saveSettings());
+    update();
   }
 
   syncVolumeControls() {
@@ -990,7 +1064,8 @@ class AudioSidebarView extends ItemView {
 
   configureTrackAudio(audio, af) {
       audio.controls = true;
-      audio.loop = this._looping !== false;
+      audio.loop = false;
+      audio.playbackRate = this.plugin.clampPlaybackRate(this.plugin.settings.playbackRate);
       audio.src = this.app.vault.getResourcePath(af);
       audio.dataset.fadeLevel = '1';
       audio.dataset.trackName = af.basename;
@@ -1019,7 +1094,10 @@ class AudioSidebarView extends ItemView {
       });
       audio.addEventListener('ended', () => {
         if (this._currentAudio === audio) {
-          if (this.plugin.settings.continuePlayback && !this._looping) {
+          if (this._looping) {
+            audio.currentTime = 0;
+            this.fadeInTrack(audio).catch(() => new Notice(`Could not repeat ${af.basename}`));
+          } else if (this.plugin.settings.continuePlayback) {
             this.playNextTrack(audio);
           } else {
             this.syncCurrentAudio();
@@ -1050,6 +1128,7 @@ class AudioSidebarView extends ItemView {
       }
     }
     this.renderUpNext(currentMusic);
+    this.updateTimeline();
     this.updateTrackListState();
   }
 
@@ -1171,6 +1250,7 @@ class AudioSidebarView extends ItemView {
     for (const [audio, timeEl] of this._npTimeEls) {
       timeEl.textContent = this.formatTime(audio.currentTime);
     }
+    this.updateTimeline();
   }
 
   formatTime(seconds) {
@@ -1432,6 +1512,10 @@ class AudioSidebarPlugin extends Plugin {
 
   clampFadeMs(value) {
     return Math.max(0, Math.min(5000, Number(value) || 0));
+  }
+
+  clampPlaybackRate(value) {
+    return Math.max(0.5, Math.min(2, Number(value) || 1));
   }
 
   // Returns a 0–1 multiplier combining master and category volumes.

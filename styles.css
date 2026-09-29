@@ -109,19 +109,35 @@
   font-size: 0.8em;
 }
 
-.audio-sb-global-volume {
+.audio-sb-timeline {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-top: 10px;
+}
+
+.audio-sb-timeline.audio-sb-hidden {
+  display: none;
+}
+
+.audio-sb-timeline-slider {
   flex: 1;
   min-width: 0;
+  margin: 0;
+}
+
+.audio-sb-timeline-time {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 0.75em;
+  font-variant-numeric: tabular-nums;
 }
 
 .audio-sb-player-settings {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: 10px;
+  gap: 6px;
+  margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid var(--background-modifier-border);
 }
@@ -143,25 +159,62 @@
   font-size: 0.75em;
 }
 
-.audio-sb-global-volume-icon {
+.audio-sb-control-wrap {
+  position: relative;
+}
+
+.audio-sb-control-wrap:first-of-type {
+  margin-left: auto;
+}
+
+.audio-sb-control-btn {
   display: flex;
-  width: 16px;
-  height: 16px;
-  color: var(--text-muted);
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 5px;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
 }
 
-.audio-sb-global-volume-slider {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
+.audio-sb-control-popup {
+  position: absolute;
+  z-index: 20;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  box-shadow: var(--shadow-s);
 }
 
-.audio-sb-global-volume-value {
-  width: 34px;
+.audio-sb-control-popup.audio-sb-hidden {
+  display: none;
+}
+
+.audio-sb-control-label,
+.audio-sb-global-volume-value,
+.audio-sb-speed-value {
   color: var(--text-muted);
   font-size: 0.75em;
   font-variant-numeric: tabular-nums;
-  text-align: right;
+  white-space: nowrap;
+}
+
+.audio-sb-vertical-slider {
+  width: 22px;
+  height: 110px;
+  margin: 0;
+  writing-mode: vertical-lr;
+  direction: rtl;
 }
 
 .audio-sb-np-empty {
