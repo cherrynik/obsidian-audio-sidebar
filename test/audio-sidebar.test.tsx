@@ -194,11 +194,12 @@ describe('AudioSidebarApp', () => {
     expect(queueTrigger).not.toHaveFocus();
   });
 
-  it('does not focus icon controls from a mouse press', () => {
+  it('keeps automatic menu controls unfocused while allowing explicit playback focus', () => {
     render(<AudioSidebarApp controller={controller()} initialSnapshot={snapshot()} />);
+    const queue = screen.getByRole('button', { name: 'Playback queue' });
     const play = screen.getByRole('button', { name: 'Pause' });
-    fireEvent.pointerDown(play, { pointerType: 'mouse', button: 0 });
-    expect(play).not.toHaveFocus();
+    expect(fireEvent.pointerDown(queue, { pointerType: 'mouse', button: 0 })).toBe(false);
+    expect(fireEvent.pointerDown(play, { pointerType: 'mouse', button: 0 })).toBe(true);
   });
 });
 

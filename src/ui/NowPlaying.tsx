@@ -31,7 +31,7 @@ export function NowPlaying({ state, current, controller }: { state: AudioSidebar
     <div className="audio-sb-transport">
       <IconButton label="Repeat track" aria-pressed={state.repeat} className={`audio-sb-icon-btn${state.repeat ? ' is-active' : ''}`} onClick={controller.toggleRepeat}>{state.repeat ? <Repeat1 /> : <Repeat />}</IconButton>
       <IconButton label="Previous track" className="audio-sb-icon-btn" onClick={controller.playPrevious}><SkipBack /></IconButton>
-      <IconButton label={state.playing ? 'Pause' : 'Play'} className="audio-sb-icon-btn audio-sb-main-play" surfaceClassName="audio-sb-main-play-surface" onClick={controller.togglePlayback}>{state.playing ? <Pause /> : <Play />}</IconButton>
+      <IconButton label={state.playing ? 'Pause' : 'Play'} className="audio-sb-icon-btn audio-sb-main-play" surfaceClassName="audio-sb-main-play-surface" focusOnMousePress onClick={controller.togglePlayback}>{state.playing ? <Pause /> : <Play />}</IconButton>
       <IconButton label="Next track" className="audio-sb-icon-btn" onClick={controller.playNext}><SkipForward /></IconButton>
       <div className="audio-sb-speed-wrap" data-open={state.speedOpen} onMouseLeave={() => controller.toggleSpeed?.(false)}>
         <Popover.Root open={state.speedOpen} onOpenChange={open => controller.toggleSpeed?.(open)}>

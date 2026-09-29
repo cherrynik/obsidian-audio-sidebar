@@ -123,6 +123,10 @@
 .audio-sb-view button.audio-sb-icon-btn:focus-visible .audio-sb-icon-surface {
   border-color: var(--interactive-accent);
 }
+.audio-sb-view button.audio-sb-main-play:focus .audio-sb-icon-surface,
+.audio-sb-view button.audio-sb-track-play:focus .audio-sb-icon-surface {
+  border-color: var(--interactive-accent);
+}
 .audio-sb-view button.audio-sb-icon-btn:disabled { opacity: .35; cursor: default; }
 .audio-sb-item-active .audio-sb-track-play { color: var(--interactive-accent); }
 .audio-sb-footer {

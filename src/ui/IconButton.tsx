@@ -4,11 +4,12 @@ type IconButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   label: string;
   children: ReactNode;
   surfaceClassName?: string;
+  focusOnMousePress?: boolean;
 };
 
-export function IconButton({ label, children, surfaceClassName = '', onPointerDown, ...props }: IconButtonProps): React.JSX.Element {
+export function IconButton({ label, children, surfaceClassName = '', focusOnMousePress = false, onPointerDown, ...props }: IconButtonProps): React.JSX.Element {
   const handlePointerDown = (event: PointerEvent<HTMLButtonElement>): void => {
-    if (event.pointerType === 'mouse' && event.button === 0) event.preventDefault();
+    if (!focusOnMousePress && event.pointerType === 'mouse' && event.button === 0) event.preventDefault();
     onPointerDown?.(event);
   };
 
