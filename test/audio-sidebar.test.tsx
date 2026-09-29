@@ -122,6 +122,17 @@ describe('AudioSidebarApp', () => {
     expect(screen.getByRole('button', { name: 'Repeat track' })).not.toHaveAttribute('title');
   });
 
+  it('shows a range value only while the pointer is held down', () => {
+    render(<AudioSidebarApp controller={controller()} initialSnapshot={snapshot()} />);
+    const seek = screen.getByRole('slider', { name: 'Seek' });
+    const range = seek.closest('.audio-sb-range');
+    expect(range).not.toHaveClass('is-adjusting');
+    fireEvent.pointerDown(seek);
+    expect(range).toHaveClass('is-adjusting');
+    fireEvent.pointerUp(seek);
+    expect(range).not.toHaveClass('is-adjusting');
+  });
+
   it('focuses the current track on pointer down so rerenders cannot swallow the click', () => {
     const controls = controller();
     render(<AudioSidebarApp controller={controls} initialSnapshot={snapshot()} />);

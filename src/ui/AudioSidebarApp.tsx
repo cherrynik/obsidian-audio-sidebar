@@ -80,9 +80,14 @@ function RangeControl({ label, className, value, maximum, step, format, onChange
   onChange(value: number): void;
 }): React.JSX.Element {
   const [preview, setPreview] = useState<number | null>(null);
+  const [adjusting, setAdjusting] = useState(false);
   const shownValue = preview ?? value;
   const updatePreview = (element: HTMLInputElement): void => setPreview(Number(element.value));
-  return <div className={`audio-sb-range${className ? ` ${className}` : ''}`} style={rangeStyle(shownValue, maximum)}>
+  const finishAdjusting = (): void => {
+    setAdjusting(false);
+    setPreview(null);
+  };
+  return <div className={`audio-sb-range${adjusting ? ' is-adjusting' : ''}${className ? ` ${className}` : ''}`} style={rangeStyle(shownValue, maximum)}>
     <input
       aria-label={label}
       type="range"
@@ -92,10 +97,10 @@ function RangeControl({ label, className, value, maximum, step, format, onChange
       value={Math.min(value, maximum)}
       onInput={event => updatePreview(event.currentTarget)}
       onChange={event => onChange(Number(event.currentTarget.value))}
-      onPointerDown={event => updatePreview(event.currentTarget)}
-      onPointerUp={() => setPreview(null)}
-      onPointerCancel={() => setPreview(null)}
-      onBlur={() => setPreview(null)}
+      onPointerDown={event => { setAdjusting(true); updatePreview(event.currentTarget); }}
+      onPointerUp={finishAdjusting}
+      onPointerCancel={finishAdjusting}
+      onBlur={finishAdjusting}
     />
     <output className="audio-sb-range-value" aria-hidden="true">{format(shownValue)}</output>
   </div>;

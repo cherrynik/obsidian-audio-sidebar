@@ -207,6 +207,8 @@
   aspect-ratio: 1;
   flex: 0 0 38px;
   overflow: hidden;
+  -webkit-clip-path: circle(19px at 50% 50%);
+  clip-path: circle(19px at 50% 50%);
   transform: none !important;
   box-shadow: none !important;
   background: var(--interactive-accent) !important;
@@ -222,6 +224,8 @@
   width: 38px !important;
   height: 38px !important;
   border-radius: 50% !important;
+  -webkit-clip-path: circle(19px at 50% 50%);
+  clip-path: circle(19px at 50% 50%);
   transform: none !important;
   color: var(--text-on-accent);
 }
@@ -427,8 +431,7 @@
   transform: translateX(-50%) translateY(2px);
   transition: opacity 70ms ease, transform 70ms ease;
 }
-.audio-sb-range:hover .audio-sb-range-value,
-.audio-sb-range:focus-within .audio-sb-range-value {
+.audio-sb-range.is-adjusting .audio-sb-range-value {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
