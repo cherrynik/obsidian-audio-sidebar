@@ -182,6 +182,17 @@ describe('AudioSidebarApp', () => {
     fireEvent.mouseEnter(screen.getByRole('button', { name: 'Playback queue' }));
     expect(controls.toggleQueue).toHaveBeenCalledWith(true);
   });
+
+  it('does not restore focus to hover popover triggers when they close', () => {
+    const state = snapshot({ queueOpen: true, speedOpen: true });
+    const controls = controller(state);
+    render(<AudioSidebarApp controller={controls} initialSnapshot={state} />);
+    const queueTrigger = screen.getByRole('button', { name: 'Playback queue' });
+    queueTrigger.blur();
+    fireEvent.mouseLeave(queueTrigger.closest('.audio-sb-queue-wrap')!);
+    expect(controls.toggleQueue).toHaveBeenCalledWith(false);
+    expect(queueTrigger).not.toHaveFocus();
+  });
 });
 
 describe('theme-safe styles', () => {
