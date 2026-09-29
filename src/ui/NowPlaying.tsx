@@ -35,7 +35,7 @@ export function NowPlaying({ state, current, controller }: { state: AudioSidebar
       <IconButton label="Next track" className="audio-sb-icon-btn" onClick={controller.playNext}><SkipForward /></IconButton>
       <div className="audio-sb-speed-wrap" data-open={state.speedOpen} onMouseLeave={() => controller.toggleSpeed?.(false)}>
         <Popover.Root open={state.speedOpen} onOpenChange={open => controller.toggleSpeed?.(open)}>
-          <Popover.Trigger asChild><button type="button" className="audio-sb-speed" onMouseEnter={() => controller.toggleSpeed?.(true)}><span className="audio-sb-icon-surface">{state.rate}×</span></button></Popover.Trigger>
+          <Popover.Trigger asChild><button type="button" className="audio-sb-speed" onPointerDown={event => { if (event.pointerType === 'mouse' && event.button === 0) event.preventDefault(); }} onMouseEnter={() => controller.toggleSpeed?.(true)}><span className="audio-sb-icon-surface">{state.rate}×</span></button></Popover.Trigger>
           <Popover.Content className="audio-sb-speed-popup" side="top" align="center" sideOffset={4} aria-label="Playback speed" onMouseEnter={() => controller.toggleSpeed?.(true)} onCloseAutoFocus={event => event.preventDefault()}>
             {[0.75, 1, 1.25, 1.5, 2].map(rate => <button key={rate} type="button" className={`audio-sb-speed-option${rate === state.rate ? ' is-active' : ''}`} aria-label={`${rate}×`} onClick={() => controller.setRate(rate)}>{rate}×</button>)}
           </Popover.Content>

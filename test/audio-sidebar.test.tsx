@@ -193,6 +193,13 @@ describe('AudioSidebarApp', () => {
     expect(controls.toggleQueue).toHaveBeenCalledWith(false);
     expect(queueTrigger).not.toHaveFocus();
   });
+
+  it('does not focus icon controls from a mouse press', () => {
+    render(<AudioSidebarApp controller={controller()} initialSnapshot={snapshot()} />);
+    const play = screen.getByRole('button', { name: 'Pause' });
+    fireEvent.pointerDown(play, { pointerType: 'mouse', button: 0 });
+    expect(play).not.toHaveFocus();
+  });
 });
 
 describe('theme-safe styles', () => {
@@ -201,6 +208,7 @@ describe('theme-safe styles', () => {
   it('keeps focus geometry on the inner circular surface', () => {
     expect(css).toMatch(/\.audio-sb-icon-surface\s*\{[^}]*border-radius:\s*50%/s);
     expect(css).toMatch(/\.audio-sb-icon-btn:focus-visible\s+\.audio-sb-icon-surface/);
+    expect(css).not.toMatch(/\.audio-sb-icon-btn:focus\s+\.audio-sb-icon-surface/);
   });
 
   it('uses theme-aware colors for range value tooltips', () => {
