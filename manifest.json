@@ -1,7 +1,7 @@
 {
   "id": "cherrynik-audio-sidebar",
   "name": "cherrynik Audio Sidebar",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "minAppVersion": "1.6.0",
   "description": "A simple persistent audio player for one track at a time.",
   "author": "cherrynik",
