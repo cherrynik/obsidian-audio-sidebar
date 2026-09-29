@@ -472,8 +472,6 @@ class AudioSidebarView extends ItemView {
     this._footerEl = content.createEl('div', { cls: 'audio-sb-footer' });
     this._footerEl.createEl('div', { text: 'Now playing', cls: 'audio-sb-footer-label' });
     this._nowPlayingListEl = this._footerEl.createEl('div', { cls: 'audio-sb-np-list' });
-    this._upNextLabelEl = this._footerEl.createEl('div', { text: 'Up next', cls: 'audio-sb-footer-label audio-sb-up-next-label' });
-    this._upNextListEl = this._footerEl.createEl('div', { cls: 'audio-sb-up-next-list' });
     this.renderTimeline(this._footerEl);
     const playerSettings = this._footerEl.createEl('div', { cls: 'audio-sb-player-settings' });
     this._loopBtn = playerSettings.createEl('button', {
@@ -484,6 +482,7 @@ class AudioSidebarView extends ItemView {
     this._loopBtn.createEl('span', { text: 'Repeat', cls: 'audio-sb-repeat-label' });
     this._loopBtn.onclick = () => this.toggleLoop();
     this.updateLoopButton();
+    this.renderQueueControl(playerSettings);
     this.renderGlobalVolume(playerSettings);
     this.renderPlaybackSpeed(playerSettings);
 
@@ -550,10 +549,9 @@ class AudioSidebarView extends ItemView {
     this.playRelativeTrack(afterAudio, 1);
   }
 
-  getVisibleQueue() {
+  getLoadedFolderQueue() {
     if (!this._trackList) return [];
     return Array.from(this._trackList.querySelectorAll('.audio-sb-item'))
-      .filter(item => !item.classList.contains('audio-sb-hidden'))
       .map(item => item.querySelector('audio')?.dataset.trackPath)
       .filter(Boolean);
   }
@@ -586,27 +584,39 @@ class AudioSidebarView extends ItemView {
 
   playRelativeTrack(fromAudio, offset) {
     const currentPath = fromAudio?.dataset.trackPath;
-    let queue = this._playQueuePaths?.length ? this._playQueuePaths : this.getVisibleQueue();
+    let queue = this._playQueuePaths?.length ? this._playQueuePaths : this.getLoadedFolderQueue();
     if (!queue.length) return;
 
     let index = queue.indexOf(currentPath);
     if (index === -1) {
-      queue = this.getVisibleQueue();
+      queue = this.getLoadedFolderQueue();
       index = offset > 0 ? -1 : 0;
     }
     if (!queue.length) return;
 
     const targetPath = queue[(index + offset + queue.length) % queue.length];
-    let target = this.getTrackAudios().find(audio => audio.dataset.trackPath === targetPath);
-    if (!target) target = this.createDetachedTrack(targetPath);
-    if (!target || target === fromAudio) {
-      if (target) target.currentTime = 0;
+    if (targetPath === currentPath) {
+      fromAudio.currentTime = 0;
       return;
     }
+    this.playQueuedTrack(targetPath);
+  }
 
-    target.currentTime = 0;
-    this.fadeInTrack(target).catch(() => {
-      new Notice(`Could not play ${target.dataset.trackName || 'track'}`);
+  playQueuedTrack(path) {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) return;
+    let audio = this.getTrackAudios().find(candidate => candidate.dataset.trackPath === path);
+    if (!audio) audio = this.createDetachedTrack(path);
+    if (!audio) return;
+    audio.currentTime = 0;
+    if (audio === this._currentAudio && !audio.paused) {
+      this.updateNowPlaying();
+      return;
+    }
+    this._queueNavigationPath = path;
+    this.fadeInTrack(audio).catch(() => {
+      if (this._queueNavigationPath === path) this._queueNavigationPath = null;
+      new Notice(`Could not play ${file.basename}`);
     });
   }
 
@@ -748,6 +758,22 @@ class AudioSidebarView extends ItemView {
     input.addEventListener('input', update);
     input.addEventListener('change', () => this.plugin.saveSettings());
     update();
+  }
+
+  renderQueueControl(parentEl) {
+    const popup = this.createPlayerPopover(parentEl, 'list-music', 'Playback queue');
+    popup.addClass('audio-sb-queue-popup');
+    popup.parentElement.addClass('audio-sb-queue-wrap');
+    this._queuePopup = popup;
+    this._queueListEl = popup.createEl('div', { cls: 'audio-sb-queue-list' });
+    this._queueButton = popup.parentElement.querySelector('button');
+    this._queueButton.addEventListener('click', () => {
+      if (!popup.classList.contains('audio-sb-hidden')) {
+        const current = this._queueListEl.querySelector('.audio-sb-queue-current');
+        if (current) popup.scrollTop = Math.max(0, current.offsetTop - popup.clientHeight / 2);
+      }
+    });
+    this.renderQueue();
   }
 
   syncVolumeControls() {
@@ -951,8 +977,22 @@ class AudioSidebarView extends ItemView {
   // Handles crossfading out other tracks and fading the new one in.
   handleTrackPlay(audio, trackName) {
     audio.dataset.lastStarted = String(Date.now());
-    const visibleQueue = this.getVisibleQueue();
-    if (visibleQueue.includes(audio.dataset.trackPath)) this._playQueuePaths = visibleQueue;
+    const path = audio.dataset.trackPath;
+    const fromQueue = this._queueNavigationPath === path;
+    this._queueNavigationPath = null;
+    const resuming = audio === this._currentAudio && this._playQueuePaths?.includes(path);
+    if (!fromQueue && !resuming) {
+      const loadedQueue = this.getLoadedFolderQueue();
+      if (loadedQueue.includes(path)) {
+        this._playQueuePaths = loadedQueue;
+        this._playQueueFolderName = this._loadedFolder?.name || 'Audio';
+      } else {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        const folder = file instanceof TFile ? file.parent : null;
+        this._playQueuePaths = folder ? this.plugin.findAudioInFolder(folder).map(item => item.path) : [path];
+        this._playQueueFolderName = folder?.name || 'Audio';
+      }
+    }
     const otherPlayingAudios = this.getTrackAudios().filter(a => a !== audio && !a.paused && !a.ended);
 
     if (!this.plugin.settings.allowMusicOverlap) {
@@ -1127,35 +1167,38 @@ class AudioSidebarView extends ItemView {
         this._addNowPlayingRow(audio, 'sfx', audio.dataset.sfxName || '?');
       }
     }
-    this.renderUpNext(currentMusic);
+    this.renderQueue();
     this.updateTimeline();
     this.updateTrackListState();
   }
 
-  renderUpNext(currentAudio) {
-    if (!this._upNextListEl || !this._upNextLabelEl) return;
-    this._upNextListEl.empty();
-    const queue = this._playQueuePaths?.length ? this._playQueuePaths : this.getVisibleQueue();
-    const currentPath = currentAudio?.dataset.trackPath;
-    const currentIndex = currentPath ? queue.indexOf(currentPath) : -1;
-    const upcoming = currentIndex >= 0 ? queue.slice(currentIndex + 1) : [];
-    this._upNextLabelEl.toggleClass('audio-sb-hidden', upcoming.length === 0);
-    this._upNextListEl.toggleClass('audio-sb-hidden', upcoming.length === 0);
-    for (const path of upcoming) {
+  renderQueue() {
+    if (!this._queueListEl) return;
+    const scrollTop = this._queuePopup.scrollTop;
+    this._queueListEl.empty();
+    const queue = this._playQueuePaths || [];
+    const currentPath = this._currentAudio?.dataset.trackPath;
+    this._queueButton.disabled = queue.length === 0;
+    this._queueButton.title = queue.length ? `Queue from ${this._playQueueFolderName || 'Audio'}` : 'No playback queue';
+    if (!queue.length) return;
+    this._queueListEl.createEl('div', {
+      text: `${this._playQueueFolderName || 'Audio'} · ${queue.length} tracks`,
+      cls: 'audio-sb-queue-heading'
+    });
+    for (let index = 0; index < queue.length; index++) {
+      const path = queue[index];
       const file = this.app.vault.getAbstractFileByPath(path);
       if (!(file instanceof TFile)) continue;
-      const row = this._upNextListEl.createEl('button', { cls: 'audio-sb-up-next-item', type: 'button' });
-      const icon = row.createEl('span', { cls: 'audio-sb-up-next-icon' });
-      setIcon(icon, 'play');
-      row.createEl('span', { text: file.basename, cls: 'audio-sb-up-next-name' });
-      row.onclick = () => {
-        let audio = this.getTrackAudios().find(candidate => candidate.dataset.trackPath === path);
-        if (!audio) audio = this.createDetachedTrack(path);
-        if (!audio) return;
-        audio.currentTime = 0;
-        this.fadeInTrack(audio).catch(() => new Notice(`Could not play ${file.basename}`));
-      };
+      const row = this._queueListEl.createEl('button', { cls: 'audio-sb-queue-item', type: 'button' });
+      const current = path === currentPath;
+      row.toggleClass('audio-sb-queue-current', current);
+      row.setAttribute('aria-current', current ? 'true' : 'false');
+      row.createEl('span', { text: String(index + 1), cls: 'audio-sb-queue-index' });
+      row.createEl('span', { text: file.basename, cls: 'audio-sb-queue-name' });
+      if (current) setIcon(row.createEl('span', { cls: 'audio-sb-queue-playing' }), 'volume-2');
+      row.onclick = () => this.playQueuedTrack(path);
     }
+    this._queuePopup.scrollTop = scrollTop;
   }
 
   updateTrackListState() {
