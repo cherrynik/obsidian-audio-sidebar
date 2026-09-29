@@ -846,7 +846,17 @@ class AudioSidebarView extends ItemView {
   }
 
   fadeOutAndStop(audio, options = {}) {
-    if (!audio || audio.paused || audio.ended) return Promise.resolve();
+    if (!audio || audio.ended) return Promise.resolve();
+    const preserveSelection = options.preserveSelection === true;
+    if (audio.paused) {
+      if (options.resetTime !== false) audio.currentTime = 0;
+      if (!preserveSelection && this._currentAudio === audio) {
+        this._currentAudio = null;
+        this._currentTrackName = '';
+      }
+      this.updateNowPlaying();
+      return Promise.resolve();
+    }
     return this.startFade(audio, 0, this.getFadeDurationMs(), {
       pauseOnComplete: true,
       resetTime: options.resetTime !== false
@@ -854,7 +864,7 @@ class AudioSidebarView extends ItemView {
       // Restore fade level so the next play starts at full volume.
       this.setFadeLevel(audio, 1);
       this.applyAudioVolume(audio);
-      if (this._currentAudio === audio) {
+      if (!preserveSelection && this._currentAudio === audio) {
         this.syncCurrentAudio();
       }
       // Always refresh now playing — the faded track must leave the list even
@@ -896,7 +906,7 @@ class AudioSidebarView extends ItemView {
     // different folder. Removing an <audio> node from the sidebar does not
     // stop it while we retain a reference to it.
     const current = this._currentAudio;
-    if (current && !current.paused && !current.ended) {
+    if (current && !current.ended) {
       if (!this._detachedAudios) this._detachedAudios = new Set();
       this._detachedAudios.add(current);
       if (this._persistentAudioEl) this._persistentAudioEl.appendChild(current);
@@ -969,7 +979,9 @@ class AudioSidebarView extends ItemView {
       audio._audioSbDurationEl = durationEl;
       this.configureTrackAudio(audio, af);
       playBtn.onclick = () => {
-        if (audio === this._currentAudio && !audio.paused) this.fadeOutAndStop(audio, { resetTime: false });
+        if (audio === this._currentAudio && !audio.paused) {
+          this.fadeOutAndStop(audio, { resetTime: false, preserveSelection: true });
+        }
         else this.fadeInTrack(audio).catch(() => new Notice(`Could not play ${af.basename}`));
       };
     }
@@ -995,15 +1007,13 @@ class AudioSidebarView extends ItemView {
         if (this._currentAudio === audio) this.updateNowPlaying();
       });
       audio.addEventListener('pause', () => {
-        // _suppressPauseSync is set during programmatic pauses (fade-out) to
-        // prevent incorrectly clearing _currentAudio mid-transition.
+        // Pausing keeps the current track, position, and queue available.
         if (this._suppressPauseSync) return;
-        if (this._detachedAudios?.has(audio)) {
+        if (this._detachedAudios?.has(audio) && this._currentAudio !== audio) {
           this._detachedAudios.delete(audio);
           audio.remove();
         }
         if (this._currentAudio === audio) {
-          this.syncCurrentAudio();
           this.updateNowPlaying();
         }
       });
@@ -1119,7 +1129,7 @@ class AudioSidebarView extends ItemView {
       playBtn.onclick = () => {
         if (type === 'music') {
           if (audio.paused) this.fadeInTrack(audio).catch(() => {});
-          else this.fadeOutAndStop(audio, { resetTime: false });
+          else this.fadeOutAndStop(audio, { resetTime: false, preserveSelection: true });
         } else {
           if (audio.paused) audio.play().catch(() => {});
           else audio.pause();
@@ -1186,7 +1196,7 @@ class AudioSidebarView extends ItemView {
       });
       return;
     }
-    this.fadeOutAndStop(this._currentAudio);
+    this.fadeOutAndStop(this._currentAudio, { resetTime: false, preserveSelection: true });
   }
 
   stopCurrentTrack(clearSelection = true) {

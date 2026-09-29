@@ -14,6 +14,7 @@ The fork keeps the original audio features and adds:
 - a stable single-track Now Playing area with the remaining queue shown under Up Next.
 - one global volume control instead of a separate native volume control on every track.
 - folder refresh and settings live in the folder header; repeat is a clearly labelled player control.
+- pausing preserves the current track, playback position, and Up Next queue until Stop is pressed.
 
 ## BRAT installation
 

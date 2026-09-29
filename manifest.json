@@ -1,7 +1,7 @@
 {
   "id": "cherrynik-audio-sidebar",
   "name": "CherryNIK Audio Sidebar",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "minAppVersion": "1.6.0",
   "description": "A persistent audio sidebar with recursive folders, automatic folder following, and uninterrupted playback.",
   "author": "Patriek Jeuriens and CherryNIK",
