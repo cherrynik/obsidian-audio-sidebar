@@ -11,6 +11,8 @@ The fork keeps the original audio features and adds:
 - previous and next controls that keep the active folder queue while browsing.
 - stable folder selection that ignores repeated clicks and disclosure toggles.
 - automatic handoff from an audio player inside a note to the persistent Now Playing player.
+- a stable single-track Now Playing area with the remaining queue shown under Up Next.
+- one global volume control instead of a separate native volume control on every track.
 
 ## BRAT installation
 

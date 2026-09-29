@@ -494,6 +494,9 @@ class AudioSidebarView extends ItemView {
     this._footerEl = content.createEl('div', { cls: 'audio-sb-footer' });
     this._footerEl.createEl('div', { text: 'Now playing', cls: 'audio-sb-footer-label' });
     this._nowPlayingListEl = this._footerEl.createEl('div', { cls: 'audio-sb-np-list' });
+    this._upNextLabelEl = this._footerEl.createEl('div', { text: 'Up next', cls: 'audio-sb-footer-label audio-sb-up-next-label' });
+    this._upNextListEl = this._footerEl.createEl('div', { cls: 'audio-sb-up-next-list' });
+    this.renderGlobalVolume(this._footerEl);
 
     if (this._nowPlayingTimer) window.clearInterval(this._nowPlayingTimer);
     this._nowPlayingTimer = window.setInterval(() => this._refreshNowPlayingTimes(), 500);
@@ -663,6 +666,30 @@ class AudioSidebarView extends ItemView {
     return input;
   }
 
+  renderGlobalVolume(parentEl) {
+    const row = parentEl.createEl('label', { cls: 'audio-sb-global-volume' });
+    const icon = row.createEl('span', { cls: 'audio-sb-global-volume-icon' });
+    setIcon(icon, 'volume-2');
+    const input = row.createEl('input', {
+      cls: 'audio-sb-global-volume-slider',
+      type: 'range',
+      attr: { min: '0', max: '100', step: '1', 'aria-label': 'Global volume' }
+    });
+    input.value = String(this.plugin.settings.masterVolume);
+    const value = row.createEl('span', {
+      text: `${this.plugin.settings.masterVolume}%`,
+      cls: 'audio-sb-global-volume-value'
+    });
+    input.addEventListener('input', () => {
+      value.textContent = `${input.value}%`;
+      this.plugin.previewVolumeSetting('masterVolume', Number(input.value));
+    });
+    input.addEventListener('change', () => {
+      this.plugin.updateVolumeSetting('masterVolume', Number(input.value));
+    });
+    this._masterVolumeInput = input;
+  }
+
   syncVolumeControls() {
     const controls = [
       [this._masterVolumeInput, this.plugin.settings.masterVolume],
@@ -674,7 +701,7 @@ class AudioSidebarView extends ItemView {
     for (const [input, value] of controls) {
       if (!input) continue;
       input.value = String(value);
-      const valueEl = input.parentElement?.querySelector('.audio-sb-volume-value');
+      const valueEl = input.parentElement?.querySelector('.audio-sb-volume-value, .audio-sb-global-volume-value');
       if (valueEl) valueEl.textContent = `${value}%`;
     }
   }
@@ -923,13 +950,27 @@ class AudioSidebarView extends ItemView {
     for (const af of audioFiles) {
       const item = this._trackList.createEl('div', { cls: 'audio-sb-item' });
       item.dataset.name = af.basename.toLowerCase();
+      item.dataset.trackPath = af.path;
 
+      const playBtn = item.createEl('button', {
+        cls: 'audio-sb-track-play',
+        type: 'button',
+        attr: { 'aria-label': `Play ${af.basename}`, title: 'Play' }
+      });
+      setIcon(playBtn, 'play');
       item.createEl('div', { text: af.basename, cls: 'audio-sb-track-name' });
-
-      const playerRow = item.createEl('div', { cls: 'audio-sb-player-row' });
-      const audio = playerRow.createEl('audio');
+      const durationEl = item.createEl('span', { text: '', cls: 'audio-sb-track-duration' });
+      const audio = item.createEl('audio', { cls: 'audio-sb-track-audio' });
+      audio._audioSbItem = item;
+      audio._audioSbPlayBtn = playBtn;
+      audio._audioSbDurationEl = durationEl;
       this.configureTrackAudio(audio, af);
+      playBtn.onclick = () => {
+        if (audio === this._currentAudio && !audio.paused) this.fadeOutAndStop(audio, { resetTime: false });
+        else this.fadeInTrack(audio).catch(() => new Notice(`Could not play ${af.basename}`));
+      };
     }
+    this.updateTrackListState();
   }
 
   configureTrackAudio(audio, af) {
@@ -944,6 +985,7 @@ class AudioSidebarView extends ItemView {
         this.handleTrackPlay(audio, af.basename);
       });
       audio.addEventListener('loadedmetadata', () => {
+        if (audio._audioSbDurationEl) audio._audioSbDurationEl.textContent = this.formatDuration(audio.duration);
         if (this._currentAudio === audio) this.updateNowPlaying();
       });
       audio.addEventListener('durationchange', () => {
@@ -979,24 +1021,65 @@ class AudioSidebarView extends ItemView {
     this._nowPlayingListEl.empty();
     this._npTimeEls = new Map();
 
-    const playingMusic = this.getTrackAudios().filter(a => !a.paused && !a.ended);
+    const currentMusic = this._currentAudio && !this._currentAudio.ended ? this._currentAudio : null;
     const playingLoops = Array.from(this.plugin._activeLoops.values());
     const playingSfx = Array.from(this.plugin._activeSfx).filter(a => !a.ended);
 
-    if (playingMusic.length === 0 && playingLoops.length === 0 && playingSfx.length === 0) {
+    if (!currentMusic && playingLoops.length === 0 && playingSfx.length === 0) {
       this._nowPlayingListEl.createEl('div', { text: 'Nothing playing', cls: 'audio-sb-np-empty' });
-      return;
+    } else {
+      if (currentMusic) this._addNowPlayingRow(currentMusic, 'music', currentMusic.dataset.trackName || '?');
+      for (const audio of playingLoops) {
+        this._addNowPlayingRow(audio, 'loop', audio.dataset.loopName || '?');
+      }
+      for (const audio of playingSfx) {
+        this._addNowPlayingRow(audio, 'sfx', audio.dataset.sfxName || '?');
+      }
     }
+    this.renderUpNext(currentMusic);
+    this.updateTrackListState();
+  }
 
-    for (const audio of playingMusic) {
-      this._addNowPlayingRow(audio, 'music', audio.dataset.trackName || '?');
+  renderUpNext(currentAudio) {
+    if (!this._upNextListEl || !this._upNextLabelEl) return;
+    this._upNextListEl.empty();
+    const queue = this._playQueuePaths?.length ? this._playQueuePaths : this.getVisibleQueue();
+    const currentPath = currentAudio?.dataset.trackPath;
+    const currentIndex = currentPath ? queue.indexOf(currentPath) : -1;
+    const upcoming = currentIndex >= 0 ? queue.slice(currentIndex + 1) : [];
+    this._upNextLabelEl.toggleClass('audio-sb-hidden', upcoming.length === 0);
+    this._upNextListEl.toggleClass('audio-sb-hidden', upcoming.length === 0);
+    for (const path of upcoming) {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (!(file instanceof TFile)) continue;
+      const row = this._upNextListEl.createEl('button', { cls: 'audio-sb-up-next-item', type: 'button' });
+      const icon = row.createEl('span', { cls: 'audio-sb-up-next-icon' });
+      setIcon(icon, 'play');
+      row.createEl('span', { text: file.basename, cls: 'audio-sb-up-next-name' });
+      row.onclick = () => {
+        let audio = this.getTrackAudios().find(candidate => candidate.dataset.trackPath === path);
+        if (!audio) audio = this.createDetachedTrack(path);
+        if (!audio) return;
+        audio.currentTime = 0;
+        this.fadeInTrack(audio).catch(() => new Notice(`Could not play ${file.basename}`));
+      };
     }
-    for (const audio of playingLoops) {
-      this._addNowPlayingRow(audio, 'loop', audio.dataset.loopName || '?');
-    }
-    for (const audio of playingSfx) {
-      this._addNowPlayingRow(audio, 'sfx', audio.dataset.sfxName || '?');
-    }
+  }
+
+  updateTrackListState() {
+    if (!this._trackList) return;
+    const currentPath = this._currentAudio?.dataset.trackPath;
+    this._trackList.querySelectorAll('.audio-sb-item').forEach(item => {
+      const active = item.dataset.trackPath === currentPath;
+      item.toggleClass('audio-sb-item-active', active);
+      const button = item.querySelector('.audio-sb-track-play');
+      if (!button) return;
+      button.empty();
+      const playing = active && this._currentAudio && !this._currentAudio.paused;
+      setIcon(button, playing ? 'pause' : 'play');
+      button.setAttribute('aria-label', `${playing ? 'Pause' : 'Play'} ${item.querySelector('.audio-sb-track-name')?.textContent || 'track'}`);
+      button.title = playing ? 'Pause' : 'Play';
+    });
   }
 
   _addNowPlayingRow(audio, type, name) {
