@@ -14,7 +14,6 @@ class ObsidianAudioSidebarController implements AudioSidebarController {
   private query = '';
   private queueOpen = false;
   private speedOpen = false;
-  private focusedPath: string | null = null;
   private snapshot: AudioSidebarSnapshot = this.createSnapshot();
   private durationRequests = new Set<string>();
 
@@ -32,15 +31,11 @@ class ObsidianAudioSidebarController implements AudioSidebarController {
     if (!(folder instanceof TFolder)) return;
     if (this.folder?.path === folder.path) return;
     this.folder = folder;
-    this.focusedPath = null;
     this.refresh();
   }
 
   focusTrack(path: string): boolean {
-    if (!this.snapshot.tracks.some(track => track.path === path)) return false;
-    this.focusedPath = path;
-    this.refresh();
-    return true;
+    return this.snapshot.tracks.some(track => track.path === path);
   }
 
   refresh(): void {
@@ -73,7 +68,6 @@ class ObsidianAudioSidebarController implements AudioSidebarController {
       tracks,
       query: this.query,
       currentPath: currentFile?.path ?? null,
-      focusedPath: this.focusedPath,
       currentTrack,
       currentLocation: currentFile?.parent?.path.split('/').join(' › ') || '',
       playing: player?.playing ?? false,
@@ -123,6 +117,7 @@ class ObsidianAudioSidebarController implements AudioSidebarController {
 
 class AudioSidebarView extends ItemView {
   private root?: Root;
+  private focusAnimation?: Animation;
   private readonly controller: ObsidianAudioSidebarController;
 
   constructor(leaf: WorkspaceLeaf, private readonly plugin: AudioSidebarPlugin) {
@@ -156,11 +151,18 @@ class AudioSidebarView extends ItemView {
       const rowBounds = row.getBoundingClientRect();
       const listBounds = list.getBoundingClientRect();
       list.scrollTop += rowBounds.top - listBounds.top - (listBounds.height - rowBounds.height) / 2;
+      this.focusAnimation?.cancel();
+      this.focusAnimation = row.animate([
+        { backgroundColor: 'var(--background-modifier-hover)', boxShadow: 'inset 0 0 0 1px var(--interactive-accent)', offset: 0 },
+        { backgroundColor: 'var(--background-modifier-hover)', boxShadow: 'inset 0 0 0 1px var(--interactive-accent)', offset: 0.82 },
+        { backgroundColor: 'transparent', boxShadow: 'inset 0 0 0 1px transparent', offset: 1 }
+      ], { duration: 2000, easing: 'ease-out' });
     }));
     return true;
   }
 
   async onClose(): Promise<void> {
+    this.focusAnimation?.cancel();
     this.root?.unmount();
     this.root = undefined;
     await this.plugin.savePlayerSettings();

@@ -75,10 +75,6 @@
 .audio-sb-view .audio-sb-item-active:hover {
   background: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
 }
-.audio-sb-view .audio-sb-item-focused {
-  background: var(--background-modifier-hover);
-  box-shadow: inset 0 0 0 1px var(--interactive-accent);
-}
 .audio-sb-track-copy { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 0; }
 .audio-sb-track-title,
 .audio-sb-track-artist { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
